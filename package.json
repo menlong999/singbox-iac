@@ -2,9 +2,17 @@
   "name": "@singbox-iac/cli",
   "version": "0.1.0",
   "description": "Policy-first subscription compiler for sing-box on macOS.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/menlong999/singbox-iac.git"
+  },
+  "homepage": "https://github.com/menlong999/singbox-iac#readme",
+  "bugs": {
+    "url": "https://github.com/menlong999/singbox-iac/issues"
+  },
   "type": "module",
   "license": "MIT",
-  "files": ["dist", "README.md", "docs", "examples"],
+  "files": ["dist", "README.md", "docs", "examples", "CONTRIBUTING.md", "LICENSE"],
   "bin": {
     "singbox-iac": "dist/cli/index.js"
   },
