@@ -297,6 +297,8 @@ export function registerSetupCommand(program: Command): void {
             ? { launchAgentsDir: resolvePath(options.launchAgentsDir) }
             : {}),
           ...(options.logsDir ? { logsDir: resolvePath(options.logsDir) } : {}),
+          ...(options.singBoxBin ? { singBoxBinary: resolvePath(options.singBoxBin) } : {}),
+          ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
           force: options.force === true,
           load: options.load !== false,
         });

@@ -18,6 +18,8 @@ export function registerScheduleCommand(program: Command): void {
     .option("--launch-agents-dir <path>", "override LaunchAgents directory")
     .option("--logs-dir <path>", "override log directory")
     .option("--cwd <path>", "working directory for launchd execution")
+    .option("--sing-box-bin <path>", "path to sing-box binary for scheduled updates")
+    .option("--chrome-bin <path>", "path to Chrome binary for scheduled verification")
     .option("-f, --force", "replace an existing LaunchAgent file")
     .option("--no-load", "write the plist without calling launchctl bootstrap")
     .action(async (options: InstallScheduleCommandOptions) => {
@@ -46,6 +48,8 @@ export function registerScheduleCommand(program: Command): void {
           : {}),
         ...(options.logsDir ? { logsDir: resolvePath(options.logsDir) } : {}),
         ...(options.cwd ? { workingDirectory: resolvePath(options.cwd) } : {}),
+        ...(options.singBoxBin ? { singBoxBinary: resolvePath(options.singBoxBin) } : {}),
+        ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
         force: options.force === true,
         load: options.load !== false,
       });
@@ -89,6 +93,8 @@ interface InstallScheduleCommandOptions extends SharedScheduleOptions {
   readonly launchAgentsDir?: string;
   readonly logsDir?: string;
   readonly cwd?: string;
+  readonly singBoxBin?: string;
+  readonly chromeBin?: string;
   readonly force?: boolean;
   readonly load?: boolean;
 }

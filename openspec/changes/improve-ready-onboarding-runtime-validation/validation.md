@@ -16,11 +16,12 @@ Date: 2026-03-31
 - visible browser windows are grouped by inbound and use the generated mixed and proxifier listener ports.
 - visible verification targets are selected from the user's natural-language prompt instead of always opening a fixed static set.
 - runtime verification now uses request-driven checks so onboarding validation is not destabilized by headless browser background traffic.
+- scheduled updates now inherit explicit `SING_BOX_BIN` and `CHROME_BIN` paths when onboarding provides them.
 
 ## Published Package
 
-- Published `@singbox-iac/cli@0.1.3` to npm.
-- Installed the published package globally and confirmed `singbox-iac --version` returned `0.1.3`.
+- Published `@singbox-iac/cli@0.1.4` to npm.
+- Installed the published package globally and confirmed `singbox-iac --version` returned `0.1.4`.
 
 ## Real First-Run Flow
 
@@ -62,6 +63,10 @@ Date: 2026-03-31
   - one proxifier-style window on `39091`
   - one mixed window on `39097`
 - Confirmed the generated LaunchAgent plist passed `plutil -lint`.
+- Confirmed the generated LaunchAgent had `last exit code = 0` under `launchctl print` when run with the isolated onboarding environment.
+- Confirmed the generated LaunchAgent environment included:
+  - `SING_BOX_BIN=/Users/lvyuanfang/Code/SingBoxConfig/.tools/sing-box-1.13.4-darwin-arm64/sing-box`
+  - `CHROME_BIN=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`
 
 ## Cleanup
 

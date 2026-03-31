@@ -12,6 +12,8 @@ export interface ScheduleInstallInput {
   readonly launchAgentsDir?: string;
   readonly workingDirectory?: string;
   readonly logsDir?: string;
+  readonly singBoxBinary?: string;
+  readonly chromeBinary?: string;
   readonly force?: boolean;
   readonly load?: boolean;
 }
@@ -66,6 +68,14 @@ export async function installLaunchdSchedule(
     stdoutPath,
     stderrPath,
     programArguments,
+    ...(input.singBoxBinary || input.chromeBinary
+      ? {
+          environment: {
+            ...(input.singBoxBinary ? { SING_BOX_BIN: path.resolve(input.singBoxBinary) } : {}),
+            ...(input.chromeBinary ? { CHROME_BIN: path.resolve(input.chromeBinary) } : {}),
+          },
+        }
+      : {}),
   });
 
   await writeFile(plistPath, plist, "utf8");
@@ -102,7 +112,13 @@ export function renderLaunchAgentPlist(input: {
   readonly stdoutPath: string;
   readonly stderrPath: string;
   readonly programArguments: readonly string[];
+  readonly environment?: Readonly<Record<string, string>>;
 }): string {
+  const environmentEntries = {
+    PATH: resolveLaunchdPath(),
+    ...(input.environment ?? {}),
+  };
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -127,8 +143,11 @@ ${input.programArguments
   <string>${escapeXml(input.stderrPath)}</string>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>PATH</key>
-    <string>${escapeXml(resolveLaunchdPath())}</string>
+${Object.entries(environmentEntries)
+  .map(
+    ([key, value]) => `    <key>${escapeXml(key)}</key>\n    <string>${escapeXml(value)}</string>`,
+  )
+  .join("\n")}
   </dict>
 </dict>
 </plist>
