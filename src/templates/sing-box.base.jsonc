@@ -1,0 +1,84 @@
+{
+  // Phase 0 skeleton template.
+  // Later phases will migrate this to the exact sing-box version-specific model.
+  "log": {
+    "level": "info"
+  },
+  "dns": {
+    "servers": [
+      {
+        "tag": "local-dns",
+        "address": "local"
+      }
+    ]
+  },
+  "inbounds": [
+    {
+      "type": "mixed",
+      "tag": "in-mixed",
+      "listen": "127.0.0.1",
+      "listen_port": 39097
+    },
+    {
+      "type": "mixed",
+      "tag": "in-proxifier",
+      "listen": "127.0.0.1",
+      "listen_port": 39091
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": {
+    "rule_set": [
+      {
+        "tag": "geosite-openai",
+        "type": "local",
+        "format": "binary",
+        "path": "/path/to/geosite-openai.srs"
+      },
+      {
+        "tag": "geosite-cn",
+        "type": "local",
+        "format": "binary",
+        "path": "/path/to/geosite-cn.srs"
+      },
+      {
+        "tag": "geoip-cn",
+        "type": "local",
+        "format": "binary",
+        "path": "/path/to/geoip-cn.srs"
+      }
+    ],
+    "rules": [
+      {
+        "network": "udp",
+        "port": 443,
+        "action": "reject"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
+      {
+        "inbound": ["in-proxifier"],
+        "action": "route",
+        "outbound": "Process-Proxy"
+      },
+      {
+        "rule_set": ["geosite-openai"],
+        "action": "route",
+        "outbound": "AI-Out"
+      },
+      {
+        "rule_set": ["geosite-cn", "geoip-cn"],
+        "action": "route",
+        "outbound": "direct"
+      }
+    ],
+    "final": "Global"
+  }
+}

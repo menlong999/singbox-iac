@@ -1,0 +1,18 @@
+version: 1
+
+beforeBuiltins:
+  - name: "OpenRouter uses the AI selector"
+    domainSuffix:
+      - "openrouter.ai"
+    route: "AI-Out"
+
+  - name: "Perplexity uses the AI selector"
+    domainSuffix:
+      - "perplexity.ai"
+    route: "AI-Out"
+
+afterBuiltins:
+  - name: "Example mainland-only host stays direct"
+    domainSuffix:
+      - "intranet.example.cn"
+    route: "direct"

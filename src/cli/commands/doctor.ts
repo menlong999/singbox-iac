@@ -1,0 +1,51 @@
+import path from "node:path";
+
+import type { Command } from "commander";
+
+import { runDoctor } from "../../modules/doctor/index.js";
+import { findDefaultConfigPath, resolveBuilderConfig } from "../command-helpers.js";
+
+export function registerDoctorCommand(program: Command): void {
+  program
+    .command("doctor")
+    .description("Inspect environment readiness for singbox-iac.")
+    .option("-c, --config <path>", "path to builder config YAML")
+    .option("--sing-box-bin <path>", "path to sing-box binary")
+    .option("--chrome-bin <path>", "path to Chrome binary")
+    .option("--launch-agents-dir <path>", "override launch agents directory for checks")
+    .action(async (options: DoctorCommandOptions) => {
+      const [config, configPath] = await Promise.all([
+        resolveBuilderConfig(options),
+        options.config ? Promise.resolve(pathResolve(options.config)) : findDefaultConfigPath(),
+      ]);
+
+      const report = await runDoctor({
+        ...(config ? { config } : {}),
+        ...(configPath ? { configPath } : {}),
+        ...(options.singBoxBin ? { singBoxBinary: options.singBoxBin } : {}),
+        ...(options.chromeBin ? { chromeBinary: options.chromeBin } : {}),
+        ...(options.launchAgentsDir
+          ? { launchAgentsDir: pathResolve(options.launchAgentsDir) }
+          : {}),
+      });
+
+      process.stdout.write(
+        `${report.checks.map((check) => `[${check.status}] ${check.name}: ${check.details}`).join("\n")}\n`,
+      );
+
+      if (report.checks.some((check) => check.status === "FAIL")) {
+        throw new Error("Doctor found blocking failures.");
+      }
+    });
+}
+
+interface DoctorCommandOptions {
+  readonly config?: string;
+  readonly singBoxBin?: string;
+  readonly chromeBin?: string;
+  readonly launchAgentsDir?: string;
+}
+
+function pathResolve(filePath: string): string {
+  return filePath.startsWith("/") ? filePath : path.resolve(process.cwd(), filePath);
+}

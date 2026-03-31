@@ -1,0 +1,51 @@
+{
+  "name": "@singbox-iac/cli",
+  "version": "0.1.0",
+  "description": "Policy-first subscription compiler for sing-box on macOS.",
+  "type": "module",
+  "license": "MIT",
+  "files": ["dist", "README.md", "docs", "examples"],
+  "bin": {
+    "singbox-iac": "dist/cli/index.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "keywords": ["sing-box", "proxy", "subscription", "macos", "cli", "proxifier"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/cli/index.ts",
+    "prepare": "npm run build",
+    "prepack": "npm run build",
+    "release:check": "node ./scripts/release-check.mjs",
+    "release:dry-run": "node ./scripts/release-dry-run.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "pino": "^9.7.0",
+    "yaml": "^2.8.0",
+    "zod": "^3.24.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2"
+  }
+}

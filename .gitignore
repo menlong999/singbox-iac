@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+.cache/
+.tools/
+builder.config.local.yaml
+.DS_Store
+.idea/
+.vscode/
+*.log
+pnpm-lock.yaml
+.env
+.npmrc
+/config.json
+/config.real.json
+/config.last-known-good.json

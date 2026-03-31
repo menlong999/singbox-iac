@@ -1,0 +1,220 @@
+version: 1
+
+subscription:
+  url: "https://example.com/subscription"
+  format: "base64-lines"
+  protocols:
+    - trojan
+
+output:
+  stagingPath: "~/.config/singbox-iac/generated/config.staging.json"
+  livePath: "~/.config/sing-box/config.json"
+  backupPath: "~/.config/singbox-iac/generated/config.last-known-good.json"
+
+runtime:
+  checkCommand: "sing-box check -c {{stagingPath}}"
+  reload:
+    kind: "signal"
+    processName: "sing-box"
+    signal: "HUP"
+
+listeners:
+  mixed:
+    enabled: true
+    listen: "127.0.0.1"
+    port: 39097
+  proxifier:
+    enabled: true
+    listen: "127.0.0.1"
+    port: 39091
+
+ruleSets:
+  - tag: "geosite-cn"
+    format: "binary"
+    type: "local"
+    path: "~/.config/sing-box/rule-set/geosite-cn.srs"
+  - tag: "geoip-cn"
+    format: "binary"
+    type: "local"
+    path: "~/.config/sing-box/rule-set/geoip-cn.srs"
+  - tag: "geosite-google"
+    format: "binary"
+    type: "local"
+    path: "~/.config/sing-box/rule-set/geosite-google.srs"
+  - tag: "geosite-google-gemini"
+    format: "binary"
+    type: "local"
+    path: "~/.config/sing-box/rule-set/geosite-google-gemini.srs"
+  - tag: "geosite-google-deepmind"
+    format: "binary"
+    type: "local"
+    path: "~/.config/sing-box/rule-set/geosite-google-deepmind.srs"
+  - tag: "geosite-anthropic"
+    format: "binary"
+    type: "local"
+    path: "~/.config/sing-box/rule-set/geosite-anthropic.srs"
+  - tag: "geosite-github"
+    format: "binary"
+    type: "local"
+    path: "~/.config/sing-box/rule-set/geosite-github.srs"
+  - tag: "geosite-github-copilot"
+    format: "binary"
+    type: "local"
+    path: "~/.config/sing-box/rule-set/geosite-github-copilot.srs"
+  - tag: "geosite-cursor"
+    format: "binary"
+    type: "local"
+    path: "~/.config/sing-box/rule-set/geosite-cursor.srs"
+  - tag: "geosite-figma"
+    format: "binary"
+    type: "local"
+    path: "~/.config/sing-box/rule-set/geosite-figma.srs"
+
+groups:
+  processProxy:
+    type: "selector"
+    includes:
+      - "US"
+      - "SG"
+      - "JP"
+      - "HK"
+    defaultNodePattern: "OnlyAI"
+  aiOut:
+    type: "selector"
+    includes:
+      - "HK"
+      - "SG"
+      - "US"
+      - "JP"
+    defaultTarget: "HK"
+  devCommonOut:
+    type: "selector"
+    includes:
+      - "HK"
+      - "SG"
+      - "US"
+      - "JP"
+    defaultTarget: "HK"
+  stitchOut:
+    type: "selector"
+    includes:
+      - "US"
+      - "SG"
+      - "JP"
+    defaultTarget: "US"
+  global:
+    type: "urltest"
+    includes:
+      - "HK"
+      - "SG"
+      - "JP"
+      - "US"
+
+rules:
+  userRulesFile: "~/.config/singbox-iac/rules/custom.rules.yaml"
+
+verification:
+  scenarios:
+    - id: "antigravity-auth"
+      name: "Antigravity auth via proxifier stays on the OnlyAI US node"
+      url: "https://accounts.google.com/favicon.ico"
+      inbound: "in-proxifier"
+      expectedOutbound: "Process-Proxy"
+    - id: "antigravity-oauth"
+      name: "Antigravity OAuth metadata via proxifier stays on the OnlyAI US node"
+      url: "https://oauth2.googleapis.com/.well-known/openid-configuration"
+      inbound: "in-proxifier"
+      expectedOutbound: "Process-Proxy"
+    - id: "antigravity-docs"
+      name: "Antigravity docs via proxifier stay on the OnlyAI US node"
+      url: "https://antigravity.google/docs"
+      inbound: "in-proxifier"
+      expectedOutbound: "Process-Proxy"
+    - id: "antigravity-rules-docs"
+      name: "Antigravity rules docs via proxifier stay on the OnlyAI US node"
+      url: "https://antigravity.google/docs/rules"
+      inbound: "in-proxifier"
+      expectedOutbound: "Process-Proxy"
+    - id: "antigravity-mcp-docs"
+      name: "Antigravity MCP docs via proxifier stay on the OnlyAI US node"
+      url: "https://antigravity.google/docs/mcp"
+      inbound: "in-proxifier"
+      expectedOutbound: "Process-Proxy"
+    - id: "antigravity-google-apis"
+      name: "Antigravity Google API discovery traffic via proxifier stays on the OnlyAI US node"
+      url: "https://www.googleapis.com/discovery/v1/apis"
+      inbound: "in-proxifier"
+      expectedOutbound: "Process-Proxy"
+    - id: "stitch-us"
+      name: "Google Stitch always uses the dedicated US exit"
+      url: "https://stitch.withgoogle.com/favicon.ico"
+      inbound: "in-mixed"
+      expectedOutbound: "Stitch-Out"
+    - id: "cn-direct"
+      name: "China traffic stays direct"
+      url: "https://www.baidu.com/favicon.ico"
+      inbound: "in-mixed"
+      expectedOutbound: "direct"
+    - id: "chatgpt-hk"
+      name: "ChatGPT uses the HK default AI path"
+      url: "https://chatgpt.com/favicon.ico"
+      inbound: "in-mixed"
+      expectedOutbound: "AI-Out"
+    - id: "openrouter-hk"
+      name: "OpenRouter custom DSL rules send traffic to the HK AI path"
+      url: "https://openrouter.ai/favicon.ico"
+      inbound: "in-mixed"
+      expectedOutbound: "AI-Out"
+    - id: "github-hk"
+      name: "GitHub uses the HK default developer path"
+      url: "https://github.com/favicon.ico"
+      inbound: "in-mixed"
+      expectedOutbound: "Dev-Common-Out"
+
+schedule:
+  enabled: true
+  intervalMinutes: 30
+
+authoring:
+  provider: "deterministic"
+  timeoutMs: 4000
+  # To try a local AI CLI safely, switch provider to "auto" or "exec".
+  # provider: "auto"
+  # provider: "exec"
+  # exec:
+  #   command: "gemini"
+  #   args:
+  #     - "-p"
+  #     - "{{full_prompt}}"
+  #
+  # provider: "exec"
+  # exec:
+  #   command: "codebuddy"
+  #   args:
+  #     - "--print"
+  #     - "--output-format"
+  #     - "json"
+  #     - "{{full_prompt}}"
+  #
+  # provider: "exec"
+  # exec:
+  #   command: "codex"
+  #   args:
+  #     - "exec"
+  #     - "--skip-git-repo-check"
+  #     - "--output-schema"
+  #     - "{{schema_file}}"
+  #     - "--output-last-message"
+  #     - "{{output_file}}"
+  #     - "{{full_prompt}}"
+  #
+  # provider: "exec"
+  # exec:
+  #   command: "claude"
+  #   args:
+  #     - "-p"
+  #     - "--output-format"
+  #     - "json"
+  #     - "--json-schema"
+  #     - "{{schema}}"
+  #     - "{{prompt}}"
