@@ -168,7 +168,7 @@ async function resolveBuildConfig(options: BuildCommandOptions): Promise<Builder
         {
           id: "cn-direct",
           name: "China traffic stays direct",
-          url: "https://www.baidu.com/favicon.ico",
+          url: "https://www.qq.com/favicon.ico",
           inbound: "in-mixed",
           expectedOutbound: "direct",
         },

@@ -57,7 +57,7 @@ describe("setup command", () => {
       "--subscription-url",
       "https://example.com/subscription",
       "--prompt",
-      "GitHub 走香港，Gemini 走新加坡，每45分钟自动更新",
+      "GitHub 走香港，Gemini 走新加坡，Antigravity 进程级走美国，每45分钟自动更新",
     ]);
 
     const configPath = path.join(homeDir, ".config", "singbox-iac", "builder.config.yaml");
@@ -70,6 +70,21 @@ describe("setup command", () => {
       "config.staging.json",
     );
     const geositeCnPath = path.join(homeDir, ".config", "sing-box", "rule-set", "geosite-cn.srs");
+    const proxifierGuidePath = path.join(
+      homeDir,
+      ".config",
+      "singbox-iac",
+      "proxifier",
+      "README.md",
+    );
+    const proxifierBundlePath = path.join(
+      homeDir,
+      ".config",
+      "singbox-iac",
+      "proxifier",
+      "bundles",
+      "antigravity.txt",
+    );
 
     const output = writeSpy.mock.calls.map((call) => String(call[0])).join("");
 
@@ -77,11 +92,17 @@ describe("setup command", () => {
     expect(existsSync(rulesPath)).toBe(true);
     expect(existsSync(stagingPath)).toBe(true);
     expect(existsSync(geositeCnPath)).toBe(true);
+    expect(existsSync(proxifierGuidePath)).toBe(true);
+    expect(existsSync(proxifierBundlePath)).toBe(true);
     expect(readFileSync(configPath, "utf8")).toContain("https://example.com/subscription");
     expect(readFileSync(configPath, "utf8")).toContain("intervalMinutes: 45");
     expect(readFileSync(rulesPath, "utf8")).toContain("github.com");
+    expect(readFileSync(proxifierGuidePath, "utf8")).toContain("Proxifier Onboarding");
+    expect(readFileSync(proxifierBundlePath, "utf8")).toContain("language_server_macos_arm");
     expect(readFileSync(stagingPath, "utf8")).toContain('"type": "trojan"');
     expect(output).toContain("Doctor:");
+    expect(output).toContain("Rule set 1/");
+    expect(output).toContain("Proxifier guide:");
     expect(writeSpy).toHaveBeenCalled();
   });
 });

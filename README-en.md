@@ -62,7 +62,7 @@ The system has three layers:
 
 ```mermaid
 flowchart TD
-    A["User provides subscription URL + one sentence"] --> B["setup"]
+    A["User provides subscription URL + one sentence"] --> B["quickstart / setup --ready"]
     B --> C["Detect local environment<br/>macOS / sing-box / Chrome / AI CLI"]
     C --> D["Generate rules from intent"]
     D --> E["Sync local rule sets"]
@@ -161,21 +161,25 @@ singbox-iac --help
 ### One-step onboarding
 
 ```bash
-singbox-iac setup \
+singbox-iac quickstart \
   --subscription-url 'your subscription URL' \
   --prompt 'GitHub and developer sites go through Hong Kong, Antigravity process traffic goes through the US, Gemini goes through Singapore, update every 30 minutes'
 ```
 
-`setup` will:
+`quickstart` will:
 
 - create `~/.config/singbox-iac/builder.config.yaml`
 - create `~/.config/singbox-iac/rules/custom.rules.yaml`
+- create `~/.config/singbox-iac/proxifier/` helper files
 - check local environment readiness
-- download default local `.srs` rule sets
+- use bundled default `.srs` rule sets and only sync extras when needed
 - turn one sentence into routing rules
 - build `~/.config/singbox-iac/generated/config.staging.json`
+- verify critical routes
+- publish the live config
+- install the recurring schedule
 
-For a more guided first-run path:
+If you want the more explicit onboarding command, you can still use:
 
 ```bash
 singbox-iac setup \
@@ -184,11 +188,10 @@ singbox-iac setup \
   --ready
 ```
 
-`--ready` additionally performs:
+The difference is simple:
 
-- route verification
-- live config publish
-- recurring schedule installation
+- `quickstart` is the shortest opinionated first-run path
+- `setup --ready` is better if you still want to control run/browser/Proxifier flags yourself
 
 ### Manual foreground run
 
@@ -245,6 +248,30 @@ The authoring layer supports:
 - preview before writing
 - closed-loop update after rule generation
 
+## Proxifier Onboarding
+
+If your AI IDE, language server, or desktop app does not respect the normal system proxy path, use the generated Proxifier helper directory:
+
+```text
+~/.config/singbox-iac/proxifier/
+```
+
+It contains:
+
+- `README.md`
+- `proxy-endpoint.txt`
+- `custom-processes.txt`
+- `bundles/antigravity.txt`
+- `bundles/cursor.txt`
+- `bundles/developer-ai-cli.txt`
+- `all-processes.txt`
+
+If you only want to regenerate the Proxifier helper files:
+
+```bash
+singbox-iac proxifier scaffold --prompt 'Antigravity process traffic goes through the US and Cursor also uses a dedicated ingress'
+```
+
 ## How It Works With sing-box
 
 This project does not replace the `sing-box` core binary. It generates and manages `sing-box` configuration.
@@ -282,6 +309,7 @@ The project does not automatically upload subscription URLs to any remote servic
 ```bash
 singbox-iac init
 singbox-iac setup
+singbox-iac quickstart
 singbox-iac author
 singbox-iac build
 singbox-iac check
@@ -290,6 +318,8 @@ singbox-iac run
 singbox-iac verify
 singbox-iac update
 singbox-iac doctor
+singbox-iac proxifier bundles
+singbox-iac proxifier scaffold
 singbox-iac schedule install
 singbox-iac schedule remove
 singbox-iac templates list
@@ -300,6 +330,7 @@ singbox-iac templates list
 - [rules-dsl.md](./docs/rules-dsl.md)
 - [rule-templates.md](./docs/rule-templates.md)
 - [natural-language-authoring.md](./docs/natural-language-authoring.md)
+- [proxifier-onboarding.md](./docs/proxifier-onboarding.md)
 - [runtime-on-macos.md](./docs/runtime-on-macos.md)
 - [openspec/project.md](./openspec/project.md)
 

@@ -14,3 +14,4 @@ pnpm-lock.yaml
 /config.json
 /config.real.json
 /config.last-known-good.json
+singbox-iac-cli-*.tgz

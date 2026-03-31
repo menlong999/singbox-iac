@@ -344,6 +344,19 @@ export async function prepareVerificationConfig(
 
   cloned.log = { level: "debug" };
 
+  const dns = asObject(cloned.dns, "Config is missing dns.");
+  dns.servers = [
+    {
+      type: "local",
+      tag: "dns-local-verify",
+      prefer_go: true,
+    },
+  ];
+  dns.final = "dns-local-verify";
+
+  const route = asObject(cloned.route, "Config is missing route.");
+  route.default_domain_resolver = "dns-local-verify";
+
   const outbounds = ensureArray<JsonObject>(cloned.outbounds, "Config is missing outbounds.");
   const globalIndex = outbounds.findIndex((outbound) => outbound.tag === "Global");
   if (globalIndex >= 0) {
@@ -419,27 +432,33 @@ export function validateConfigInvariants(config: JsonObject): VerificationCheckR
       rule.rule_set.includes("geosite-cn") &&
       rule.outbound === "direct",
   );
+  const priorityOrder = [
+    { name: "quic", index: quicIndex, required: true },
+    { name: "dns", index: dnsIndex, required: true },
+    { name: "proxifier", index: proxifierIndex, required: true },
+    { name: "stitch", index: stitchIndex, required: true },
+    { name: "explicitAi", index: explicitAiIndex, required: true },
+    { name: "aiRuleSet", index: aiRuleSetIndex, required: false },
+    { name: "devRuleSet", index: devRuleSetIndex, required: false },
+    { name: "china", index: chinaIndex, required: false },
+  ];
+  const routePriorityPassed =
+    priorityOrder.every((entry) => !entry.required || entry.index >= 0) &&
+    priorityOrder
+      .filter((entry) => entry.index >= 0)
+      .every((entry, index, entries) => {
+        if (index === 0) {
+          return true;
+        }
+
+        const previous = entries[index - 1];
+        return previous !== undefined && previous.index < entry.index;
+      });
 
   checks.push(
     makeCheck(
       "route-priority",
-      [
-        quicIndex,
-        dnsIndex,
-        proxifierIndex,
-        stitchIndex,
-        explicitAiIndex,
-        aiRuleSetIndex,
-        devRuleSetIndex,
-        chinaIndex,
-      ].every((index) => index >= 0) &&
-        quicIndex < dnsIndex &&
-        dnsIndex < proxifierIndex &&
-        proxifierIndex < stitchIndex &&
-        stitchIndex < explicitAiIndex &&
-        explicitAiIndex < aiRuleSetIndex &&
-        aiRuleSetIndex < devRuleSetIndex &&
-        devRuleSetIndex < chinaIndex,
+      routePriorityPassed,
       `Rule order indices: quic=${quicIndex}, dns=${dnsIndex}, proxifier=${proxifierIndex}, stitch=${stitchIndex}, explicitAi=${explicitAiIndex}, aiRuleSet=${aiRuleSetIndex}, devRuleSet=${devRuleSetIndex}, china=${chinaIndex}`,
     ),
   );
@@ -456,8 +475,15 @@ export function validateConfigInvariants(config: JsonObject): VerificationCheckR
   checks.push(
     makeCheck(
       "dns-shape",
-      dnsServers.some((server) => server.type === "udp" && server.server === "1.1.1.1") &&
-        dnsServers.some((server) => server.type === "udp" && server.server === "223.5.5.5"),
+      dnsServers.some((server) => server.type === "local" && server.tag === "dns-local-default") &&
+        dnsServers.some(
+          (server) =>
+            (server.type === "tcp" || server.type === "udp") && server.server === "1.1.1.1",
+        ) &&
+        dnsServers.some(
+          (server) =>
+            (server.type === "tcp" || server.type === "udp") && server.server === "223.5.5.5",
+        ),
       `dns servers=${dnsServers
         .map((server) => `${String(server.tag)}:${String(server.server)}`)
         .join(", ")}`,
@@ -567,14 +593,14 @@ const defaultConfiguredScenarios: readonly ConfiguredVerificationScenario[] = [
   {
     id: "cn-direct",
     name: "China traffic routes direct on mixed inbound",
-    url: "https://www.baidu.com/favicon.ico",
+    url: "https://www.qq.com/favicon.ico",
     inbound: "in-mixed",
     expectedOutbound: "direct",
   },
   {
     id: "proxifier-precedence",
     name: "Proxifier inbound overrides CN direct rule",
-    url: "https://www.baidu.com/favicon.ico",
+    url: "https://www.qq.com/favicon.ico",
     inbound: "in-proxifier",
     expectedOutbound: "Process-Proxy",
   },

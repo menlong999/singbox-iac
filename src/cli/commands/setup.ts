@@ -18,6 +18,10 @@ import {
   updateBuilderAuthoring,
   writeGeneratedRules,
 } from "../../modules/natural-language/index.js";
+import {
+  selectProxifierBundlesFromPrompt,
+  writeProxifierScaffold,
+} from "../../modules/proxifier/index.js";
 import { syncLocalRuleSets } from "../../modules/rule-set-sync/index.js";
 import { installLaunchdSchedule } from "../../modules/schedule/index.js";
 import {
@@ -75,337 +79,400 @@ export function registerSetupCommand(program: Command): void {
     .option("--label <label>", "LaunchAgent label", "org.singbox-iac.update")
     .option("--launch-agents-dir <path>", "override LaunchAgents directory")
     .option("--logs-dir <path>", "override launchd log directory")
+    .option("--proxifier-out-dir <path>", "write Proxifier helper files for process-aware routing")
     .option(
       "-f, --force",
       "overwrite generated files during first-time setup and re-download rulesets",
     )
     .option("--no-load", "write the LaunchAgent without calling launchctl bootstrap")
     .action(async (options: SetupCommandOptions) => {
-      const configPath = resolvePath(options.config);
-      const rulesPath = resolvePath(options.rulesOut);
-      const createdFreshConfig = options.force === true || !(await pathExists(configPath));
-
-      if (createdFreshConfig) {
-        if (!options.subscriptionUrl) {
-          throw new Error(
-            "setup needs --subscription-url the first time. Existing configs can omit it.",
-          );
-        }
-
-        await initWorkspace({
-          configOutPath: configPath,
-          rulesOutPath: rulesPath,
-          examplesDir: path.join(resolvePackageRoot(import.meta.url), "examples"),
-          subscriptionUrl: options.subscriptionUrl,
-          force: options.force === true,
-        });
-      }
-
-      let builderConfig = await loadConfig(configPath);
-
-      if (!createdFreshConfig && options.subscriptionUrl) {
-        await updateBuilderAuthoring({
-          configPath,
-          subscriptionUrl: options.subscriptionUrl,
-        });
-        builderConfig = await loadConfig(configPath);
-      }
-
-      let effectiveConfig = builderConfig;
-      let planSummary:
-        | {
-            providerRequested: string;
-            providerUsed: string;
-            templates: readonly string[];
-            generatedRules: number;
-            notes: readonly string[];
-          }
-        | undefined;
-
-      if (options.prompt) {
-        const planResult = await generateAuthoringPlan({
-          prompt: options.prompt,
-          config: builderConfig,
-          ...(options.provider ? { provider: options.provider } : {}),
-          ...(options.authorTimeoutMs
-            ? { timeoutMs: Number.parseInt(options.authorTimeoutMs, 10) }
-            : {}),
-          ...(options.execCommand ? { execCommand: options.execCommand } : {}),
-          ...(options.execArg.length > 0 ? { execArgs: options.execArg } : {}),
-        });
-
-        effectiveConfig = applyPlanToBuilderConfig(builderConfig, {
-          rulesPath: builderConfig.rules.userRulesFile,
-          plan: planResult.plan,
-        });
-
-        await writeGeneratedRules({
-          filePath: effectiveConfig.rules.userRulesFile,
-          plan: planResult.plan,
-        });
-        await updateBuilderAuthoring({
-          configPath,
-          rulesPath: effectiveConfig.rules.userRulesFile,
-          ...(planResult.plan.scheduleIntervalMinutes
-            ? { intervalMinutes: planResult.plan.scheduleIntervalMinutes }
-            : {}),
-          ...(planResult.plan.groupDefaults
-            ? { groupDefaults: planResult.plan.groupDefaults }
-            : {}),
-          ...(planResult.plan.verificationOverrides
-            ? { verificationOverrides: planResult.plan.verificationOverrides }
-            : {}),
-        });
-        builderConfig = await loadConfig(configPath);
-        effectiveConfig = builderConfig;
-        planSummary = {
-          providerRequested: planResult.providerRequested,
-          providerUsed: planResult.providerUsed,
-          templates: planResult.plan.templateIds,
-          generatedRules:
-            planResult.plan.beforeBuiltins.length + planResult.plan.afterBuiltins.length,
-          notes: planResult.plan.notes,
-        };
-      }
-
-      const lines = [`Config: ${configPath}`, `Rules: ${effectiveConfig.rules.userRulesFile}`];
-      const shouldDoctor = options.doctor !== false || options.ready === true;
-      const shouldVerify = options.verify === true || options.ready === true;
-      const shouldApply = options.apply === true || options.ready === true;
-      const shouldInstallSchedule = options.installSchedule === true || options.ready === true;
-      const shouldRun = options.run === true;
-      const shouldOpenBrowser =
-        options.openBrowser === true || (options.ready === true && options.run === true);
-
-      if (options.skipBuild && (shouldVerify || shouldApply)) {
-        throw new Error("setup cannot use --skip-build together with --verify or --apply.");
-      }
-      if (options.skipBuild && shouldRun) {
-        throw new Error("setup cannot use --skip-build together with --run.");
-      }
-
-      if (shouldDoctor) {
-        const doctorReport = await runDoctor({
-          config: effectiveConfig,
-          configPath,
-          ...(options.singBoxBin ? { singBoxBinary: resolvePath(options.singBoxBin) } : {}),
-          ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
-          ...(options.launchAgentsDir
-            ? { launchAgentsDir: resolvePath(options.launchAgentsDir) }
-            : {}),
-        });
-        lines.push(...formatDoctorSummary(doctorReport));
-      }
-
-      if (options.skipRulesets) {
-        lines.push("Rule sets: skipped");
-      } else {
-        const syncResult = await syncLocalRuleSets({
-          ruleSets: effectiveConfig.ruleSets,
-          force: options.force === true,
-        });
-        lines.push(
-          `Rule sets: downloaded ${syncResult.downloaded.length}, skipped ${syncResult.skipped.length}, failed ${syncResult.failed.length}`,
-        );
-        if (syncResult.failed.length > 0) {
-          lines.push(...syncResult.failed.map((failure) => `- ${failure.tag}: ${failure.reason}`));
-        }
-      }
-
-      if (planSummary) {
-        lines.push(`Provider requested: ${planSummary.providerRequested}`);
-        lines.push(`Provider used: ${planSummary.providerUsed}`);
-        lines.push(
-          `Templates: ${planSummary.templates.length > 0 ? planSummary.templates.join(", ") : "(none)"}`,
-        );
-        lines.push(`Generated rules: ${planSummary.generatedRules}`);
-        if (planSummary.notes.length > 0) {
-          lines.push(...planSummary.notes.map((note) => `- ${note}`));
-        }
-      }
-
-      let buildSummary:
-        | {
-            outputPath: string;
-            nodeCount: number;
-            verification?: VerificationReport;
-          }
-        | undefined;
-
-      let schedulePath: string | undefined;
-
-      if (options.skipBuild) {
-        lines.push("Staging: skipped");
-      } else {
-        const build = await buildConfigArtifact({
-          config: effectiveConfig,
-          ...(options.subscriptionFile
-            ? { subscriptionFile: resolvePath(options.subscriptionFile) }
-            : {}),
-          ...(options.subscriptionUrl ? { subscriptionUrl: options.subscriptionUrl } : {}),
-        });
-        lines.push(`Staging: ${build.outputPath}`);
-        lines.push(`Nodes: ${build.nodeCount}`);
-
-        let verification: VerificationReport | undefined;
-        if (shouldVerify) {
-          verification = await verifyConfigRoutes({
-            configPath: build.outputPath,
-            ...(options.singBoxBin ? { singBoxBinary: resolvePath(options.singBoxBin) } : {}),
-            ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
-            configuredScenarios: effectiveConfig.verification.scenarios,
-          });
-          assertVerificationReportPassed(verification);
-          lines.push(
-            `Verified scenarios: ${
-              verification.scenarios.filter((scenario) => scenario.passed).length
-            }/${verification.scenarios.length}`,
-          );
-        }
-
-        if (shouldApply) {
-          await applyConfig({
-            stagingPath: build.outputPath,
-            livePath: effectiveConfig.output.livePath,
-            ...(effectiveConfig.output.backupPath
-              ? { backupPath: effectiveConfig.output.backupPath }
-              : {}),
-            ...(options.singBoxBin ? { singBoxBinary: resolvePath(options.singBoxBin) } : {}),
-            reload: options.reload === true,
-            runtime: effectiveConfig.runtime.reload,
-          });
-          lines.push(`Live: ${effectiveConfig.output.livePath}`);
-          if (effectiveConfig.output.backupPath) {
-            lines.push(`Backup: ${effectiveConfig.output.backupPath}`);
-          }
-        }
-
-        buildSummary = {
-          outputPath: build.outputPath,
-          nodeCount: build.nodeCount,
-          ...(verification ? { verification } : {}),
-        };
-      }
-
-      if (shouldInstallSchedule) {
-        const schedule = await installLaunchdSchedule({
-          configPath,
-          intervalMinutes: effectiveConfig.schedule.intervalMinutes,
-          cliEntrypoint: resolveCliEntrypoint(import.meta.url),
-          label: options.label,
-          ...(options.launchAgentsDir
-            ? { launchAgentsDir: resolvePath(options.launchAgentsDir) }
-            : {}),
-          ...(options.logsDir ? { logsDir: resolvePath(options.logsDir) } : {}),
-          ...(options.singBoxBin ? { singBoxBinary: resolvePath(options.singBoxBin) } : {}),
-          ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
-          force: options.force === true,
-          load: options.load !== false,
-        });
-        schedulePath = schedule.plistPath;
-        lines.push(`LaunchAgent: ${schedule.plistPath}`);
-      }
-
-      lines.push(
-        `Proxy ports: mixed ${effectiveConfig.listeners.mixed.listen}:${effectiveConfig.listeners.mixed.port}, proxifier ${effectiveConfig.listeners.proxifier.listen}:${effectiveConfig.listeners.proxifier.port}`,
-      );
-      if (shouldApply) {
-        lines.push("Next: sing-box run -c ~/.config/sing-box/config.json");
-        if (schedulePath) {
-          lines.push("Schedule: installed and ready for recurring updates");
-        } else {
-          lines.push("Next: singbox-iac schedule install");
-        }
-      } else if (buildSummary) {
-        lines.push("Next: singbox-iac run");
-        lines.push("Next: singbox-iac update --reload");
-      }
-
-      process.stdout.write(`${lines.join("\n")}\n`);
-
-      if (!shouldRun || !buildSummary) {
-        return;
-      }
-
-      const runConfigPath = shouldApply ? effectiveConfig.output.livePath : buildSummary.outputPath;
-      const singBoxBinary = await resolveSingBoxBinary(
-        options.singBoxBin ? resolvePath(options.singBoxBin) : undefined,
-      );
-
-      await checkConfig({
-        configPath: runConfigPath,
-        singBoxBinary,
-      });
-
-      const child = spawn(singBoxBinary, ["run", "-c", runConfigPath], {
-        stdio: "inherit",
-      });
-
-      try {
-        await waitForPorts(
-          [
-            {
-              host: effectiveConfig.listeners.mixed.listen,
-              port: effectiveConfig.listeners.mixed.port,
-            },
-            {
-              host: effectiveConfig.listeners.proxifier.listen,
-              port: effectiveConfig.listeners.proxifier.port,
-            },
-          ],
-          15_000,
-        );
-
-        if (shouldOpenBrowser) {
-          const selectedScenarios = options.prompt
-            ? selectVerificationScenariosForPrompt(
-                options.prompt,
-                effectiveConfig.verification.scenarios,
-              )
-            : effectiveConfig.verification.scenarios.slice(
-                0,
-                Math.min(3, effectiveConfig.verification.scenarios.length),
-              );
-
-          const visibleScenarios = selectedScenarios.map((scenario) => ({
-            id: scenario.id,
-            name: scenario.name,
-            url: scenario.url,
-            inbound: scenario.inbound,
-          }));
-          const launches = await openVisibleChromeWindows({
-            scenarios: visibleScenarios,
-            mixedPort: effectiveConfig.listeners.mixed.port,
-            proxifierPort: effectiveConfig.listeners.proxifier.port,
-            ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
-          });
-
-          process.stdout.write(
-            `${launches
-              .map(
-                (launch) =>
-                  `Opened Chrome for ${launch.inbound} on ${launch.urls.join(", ")} via 127.0.0.1:${launch.proxyPort}`,
-              )
-              .join("\n")}\n`,
-          );
-        }
-
-        process.stdout.write(`Running sing-box in foreground: ${runConfigPath}\n`);
-
-        const exitCode = await new Promise<number>((resolve, reject) => {
-          child.on("error", reject);
-          child.on("close", (code) => resolve(code ?? 0));
-        });
-        process.exitCode = exitCode;
-      } finally {
-        if (!child.killed && child.exitCode === null) {
-          child.kill("SIGINT");
-        }
-      }
+      await runSetupFlow(options);
     });
 }
 
-interface SetupCommandOptions {
+export async function runSetupFlow(options: SetupCommandOptions): Promise<void> {
+  const configPath = resolvePath(options.config);
+  const rulesPath = resolvePath(options.rulesOut);
+  const createdFreshConfig = options.force === true || !(await pathExists(configPath));
+
+  if (createdFreshConfig) {
+    if (!options.subscriptionUrl) {
+      throw new Error(
+        "setup needs --subscription-url the first time. Existing configs can omit it.",
+      );
+    }
+
+    await initWorkspace({
+      configOutPath: configPath,
+      rulesOutPath: rulesPath,
+      examplesDir: path.join(resolvePackageRoot(import.meta.url), "examples"),
+      subscriptionUrl: options.subscriptionUrl,
+      force: options.force === true,
+    });
+  }
+
+  let builderConfig = await loadConfig(configPath);
+
+  if (!createdFreshConfig && options.subscriptionUrl) {
+    await updateBuilderAuthoring({
+      configPath,
+      subscriptionUrl: options.subscriptionUrl,
+    });
+    builderConfig = await loadConfig(configPath);
+  }
+
+  let effectiveConfig = builderConfig;
+  let planSummary:
+    | {
+        providerRequested: string;
+        providerUsed: string;
+        templates: readonly string[];
+        generatedRules: number;
+        notes: readonly string[];
+      }
+    | undefined;
+  let proxifierSummary:
+    | {
+        guidePath: string;
+        bundleIds: readonly string[];
+      }
+    | undefined;
+
+  if (options.prompt) {
+    const planResult = await generateAuthoringPlan({
+      prompt: options.prompt,
+      config: builderConfig,
+      ...(options.provider ? { provider: options.provider } : {}),
+      ...(options.authorTimeoutMs
+        ? { timeoutMs: Number.parseInt(options.authorTimeoutMs, 10) }
+        : {}),
+      ...(options.execCommand ? { execCommand: options.execCommand } : {}),
+      ...(options.execArg.length > 0 ? { execArgs: options.execArg } : {}),
+    });
+
+    effectiveConfig = applyPlanToBuilderConfig(builderConfig, {
+      rulesPath: builderConfig.rules.userRulesFile,
+      plan: planResult.plan,
+    });
+
+    await writeGeneratedRules({
+      filePath: effectiveConfig.rules.userRulesFile,
+      plan: planResult.plan,
+    });
+    await updateBuilderAuthoring({
+      configPath,
+      rulesPath: effectiveConfig.rules.userRulesFile,
+      ...(planResult.plan.scheduleIntervalMinutes
+        ? { intervalMinutes: planResult.plan.scheduleIntervalMinutes }
+        : {}),
+      ...(planResult.plan.groupDefaults ? { groupDefaults: planResult.plan.groupDefaults } : {}),
+      ...(planResult.plan.verificationOverrides
+        ? { verificationOverrides: planResult.plan.verificationOverrides }
+        : {}),
+    });
+    builderConfig = await loadConfig(configPath);
+    effectiveConfig = builderConfig;
+    planSummary = {
+      providerRequested: planResult.providerRequested,
+      providerUsed: planResult.providerUsed,
+      templates: planResult.plan.templateIds,
+      generatedRules: planResult.plan.beforeBuiltins.length + planResult.plan.afterBuiltins.length,
+      notes: planResult.plan.notes,
+    };
+  }
+
+  const lines = [`Config: ${configPath}`, `Rules: ${effectiveConfig.rules.userRulesFile}`];
+  const shouldDoctor = options.doctor !== false || options.ready === true;
+  const shouldVerify = options.verify === true || options.ready === true;
+  const shouldApply = options.apply === true || options.ready === true;
+  const shouldInstallSchedule = options.installSchedule === true || options.ready === true;
+  const shouldRun = options.run === true;
+  const shouldOpenBrowser =
+    options.openBrowser === true || (options.ready === true && options.run === true);
+
+  if (options.skipBuild && (shouldVerify || shouldApply)) {
+    throw new Error("setup cannot use --skip-build together with --verify or --apply.");
+  }
+  if (options.skipBuild && shouldRun) {
+    throw new Error("setup cannot use --skip-build together with --run.");
+  }
+
+  if (options.skipRulesets) {
+    lines.push("Rule sets: skipped");
+  } else {
+    const syncResult = await syncLocalRuleSets({
+      ruleSets: effectiveConfig.ruleSets,
+      force: options.force === true,
+      timeoutMs: 15000,
+      onProgress: (event) => {
+        if (event.phase === "start") {
+          process.stdout.write(
+            `Rule set ${event.index}/${event.total}: downloading ${event.tag}\n`,
+          );
+          return;
+        }
+
+        if (event.phase === "downloaded") {
+          process.stdout.write(`Rule set ${event.index}/${event.total}: saved ${event.tag}\n`);
+          return;
+        }
+
+        if (event.phase === "bundled") {
+          process.stdout.write(`Rule set ${event.index}/${event.total}: bundled ${event.tag}\n`);
+          return;
+        }
+
+        if (event.phase === "skipped") {
+          process.stdout.write(`Rule set ${event.index}/${event.total}: cached ${event.tag}\n`);
+          return;
+        }
+
+        process.stdout.write(
+          `Rule set ${event.index}/${event.total}: failed ${event.tag} (${event.reason ?? "unknown error"})\n`,
+        );
+      },
+    });
+    lines.push(
+      `Rule sets: downloaded ${syncResult.downloaded.length}, skipped ${syncResult.skipped.length}, failed ${syncResult.failed.length}`,
+    );
+    if (syncResult.failed.length > 0) {
+      lines.push(...syncResult.failed.map((failure) => `- ${failure.tag}: ${failure.reason}`));
+    }
+  }
+
+  if (shouldDoctor) {
+    const doctorReport = await runDoctor({
+      config: effectiveConfig,
+      configPath,
+      ...(options.singBoxBin ? { singBoxBinary: resolvePath(options.singBoxBin) } : {}),
+      ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
+      ...(options.launchAgentsDir ? { launchAgentsDir: resolvePath(options.launchAgentsDir) } : {}),
+    });
+    lines.push(...formatDoctorSummary(doctorReport));
+  }
+
+  if (planSummary) {
+    lines.push(`Provider requested: ${planSummary.providerRequested}`);
+    lines.push(`Provider used: ${planSummary.providerUsed}`);
+    lines.push(
+      `Templates: ${planSummary.templates.length > 0 ? planSummary.templates.join(", ") : "(none)"}`,
+    );
+    lines.push(`Generated rules: ${planSummary.generatedRules}`);
+    if (planSummary.notes.length > 0) {
+      lines.push(...planSummary.notes.map((note) => `- ${note}`));
+    }
+  }
+
+  const selectedProxifierBundles = options.prompt
+    ? selectProxifierBundlesFromPrompt(options.prompt)
+    : [];
+  if (options.proxifierOutDir || selectedProxifierBundles.length > 0) {
+    const proxifierOutputDir = resolvePath(
+      options.proxifierOutDir ?? path.join(path.dirname(configPath), "proxifier"),
+    );
+    const scaffold = await writeProxifierScaffold({
+      listener: {
+        host: effectiveConfig.listeners.proxifier.listen,
+        port: effectiveConfig.listeners.proxifier.port,
+      },
+      outputDir: proxifierOutputDir,
+      ...(selectedProxifierBundles.length > 0 ? { bundleIds: selectedProxifierBundles } : {}),
+    });
+    proxifierSummary = {
+      guidePath: scaffold.guidePath,
+      bundleIds: scaffold.bundles.map((bundle) => bundle.id),
+    };
+  }
+
+  if (proxifierSummary) {
+    lines.push(`Proxifier guide: ${proxifierSummary.guidePath}`);
+    lines.push(
+      `Proxifier bundles: ${
+        proxifierSummary.bundleIds.length > 0
+          ? proxifierSummary.bundleIds.join(", ")
+          : "(manual custom-processes.txt)"
+      }`,
+    );
+  }
+
+  let buildSummary:
+    | {
+        outputPath: string;
+        nodeCount: number;
+        verification?: VerificationReport;
+      }
+    | undefined;
+  let schedulePath: string | undefined;
+
+  if (options.skipBuild) {
+    lines.push("Staging: skipped");
+  } else {
+    const build = await buildConfigArtifact({
+      config: effectiveConfig,
+      ...(options.subscriptionFile
+        ? { subscriptionFile: resolvePath(options.subscriptionFile) }
+        : {}),
+      ...(options.subscriptionUrl ? { subscriptionUrl: options.subscriptionUrl } : {}),
+    });
+    lines.push(`Staging: ${build.outputPath}`);
+    lines.push(`Nodes: ${build.nodeCount}`);
+
+    let verification: VerificationReport | undefined;
+    if (shouldVerify) {
+      verification = await verifyConfigRoutes({
+        configPath: build.outputPath,
+        ...(options.singBoxBin ? { singBoxBinary: resolvePath(options.singBoxBin) } : {}),
+        ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
+        configuredScenarios: effectiveConfig.verification.scenarios,
+      });
+      assertVerificationReportPassed(verification);
+      lines.push(
+        `Verified scenarios: ${
+          verification.scenarios.filter((scenario) => scenario.passed).length
+        }/${verification.scenarios.length}`,
+      );
+    }
+
+    if (shouldApply) {
+      await applyConfig({
+        stagingPath: build.outputPath,
+        livePath: effectiveConfig.output.livePath,
+        ...(effectiveConfig.output.backupPath
+          ? { backupPath: effectiveConfig.output.backupPath }
+          : {}),
+        ...(options.singBoxBin ? { singBoxBinary: resolvePath(options.singBoxBin) } : {}),
+        reload: options.reload === true,
+        runtime: effectiveConfig.runtime.reload,
+      });
+      lines.push(`Live: ${effectiveConfig.output.livePath}`);
+      if (effectiveConfig.output.backupPath) {
+        lines.push(`Backup: ${effectiveConfig.output.backupPath}`);
+      }
+    }
+
+    buildSummary = {
+      outputPath: build.outputPath,
+      nodeCount: build.nodeCount,
+      ...(verification ? { verification } : {}),
+    };
+  }
+
+  if (shouldInstallSchedule) {
+    const schedule = await installLaunchdSchedule({
+      configPath,
+      intervalMinutes: effectiveConfig.schedule.intervalMinutes,
+      cliEntrypoint: resolveCliEntrypoint(import.meta.url),
+      label: options.label,
+      ...(options.launchAgentsDir ? { launchAgentsDir: resolvePath(options.launchAgentsDir) } : {}),
+      ...(options.logsDir ? { logsDir: resolvePath(options.logsDir) } : {}),
+      ...(options.singBoxBin ? { singBoxBinary: resolvePath(options.singBoxBin) } : {}),
+      ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
+      force: options.force === true,
+      load: options.load !== false,
+    });
+    schedulePath = schedule.plistPath;
+    lines.push(`LaunchAgent: ${schedule.plistPath}`);
+  }
+
+  lines.push(
+    `Proxy ports: mixed ${effectiveConfig.listeners.mixed.listen}:${effectiveConfig.listeners.mixed.port}, proxifier ${effectiveConfig.listeners.proxifier.listen}:${effectiveConfig.listeners.proxifier.port}`,
+  );
+  if (shouldApply) {
+    lines.push("Next: sing-box run -c ~/.config/sing-box/config.json");
+    if (schedulePath) {
+      lines.push("Schedule: installed and ready for recurring updates");
+    } else {
+      lines.push("Next: singbox-iac schedule install");
+    }
+  } else if (buildSummary) {
+    lines.push("Next: singbox-iac run");
+    lines.push("Next: singbox-iac update --reload");
+  }
+
+  process.stdout.write(`${lines.join("\n")}\n`);
+
+  if (!shouldRun || !buildSummary) {
+    return;
+  }
+
+  const runConfigPath = shouldApply ? effectiveConfig.output.livePath : buildSummary.outputPath;
+  const singBoxBinary = await resolveSingBoxBinary(
+    options.singBoxBin ? resolvePath(options.singBoxBin) : undefined,
+  );
+
+  await checkConfig({
+    configPath: runConfigPath,
+    singBoxBinary,
+  });
+
+  const child = spawn(singBoxBinary, ["run", "-c", runConfigPath], {
+    stdio: "inherit",
+  });
+
+  try {
+    await waitForPorts(
+      [
+        {
+          host: effectiveConfig.listeners.mixed.listen,
+          port: effectiveConfig.listeners.mixed.port,
+        },
+        {
+          host: effectiveConfig.listeners.proxifier.listen,
+          port: effectiveConfig.listeners.proxifier.port,
+        },
+      ],
+      15_000,
+    );
+
+    if (shouldOpenBrowser) {
+      const selectedScenarios = options.prompt
+        ? selectVerificationScenariosForPrompt(
+            options.prompt,
+            effectiveConfig.verification.scenarios,
+          )
+        : effectiveConfig.verification.scenarios.slice(
+            0,
+            Math.min(3, effectiveConfig.verification.scenarios.length),
+          );
+
+      const visibleScenarios = selectedScenarios.map((scenario) => ({
+        id: scenario.id,
+        name: scenario.name,
+        url: scenario.url,
+        inbound: scenario.inbound,
+      }));
+      const launches = await openVisibleChromeWindows({
+        scenarios: visibleScenarios,
+        mixedPort: effectiveConfig.listeners.mixed.port,
+        proxifierPort: effectiveConfig.listeners.proxifier.port,
+        ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
+      });
+
+      process.stdout.write(
+        `${launches
+          .map(
+            (launch) =>
+              `Opened Chrome for ${launch.inbound} on ${launch.urls.join(", ")} via 127.0.0.1:${launch.proxyPort}`,
+          )
+          .join("\n")}\n`,
+      );
+    }
+
+    process.stdout.write(`Running sing-box in foreground: ${runConfigPath}\n`);
+
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      child.on("error", reject);
+      child.on("close", (code) => resolve(code ?? 0));
+    });
+    process.exitCode = exitCode;
+  } finally {
+    if (!child.killed && child.exitCode === null) {
+      child.kill("SIGINT");
+    }
+  }
+}
+
+export interface SetupCommandOptions {
   readonly config: string;
   readonly rulesOut: string;
   readonly subscriptionUrl?: string;
@@ -430,6 +497,7 @@ interface SetupCommandOptions {
   readonly label: string;
   readonly launchAgentsDir?: string;
   readonly logsDir?: string;
+  readonly proxifierOutDir?: string;
   readonly force?: boolean;
   readonly load?: boolean;
 }

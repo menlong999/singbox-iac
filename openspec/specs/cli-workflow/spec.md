@@ -8,6 +8,7 @@ Provide a user-friendly command-line interface for initialization, build, apply,
 
 - `init`
 - `setup`
+- `quickstart`
 - `author`
 - `build`
 - `check`
@@ -16,6 +17,8 @@ Provide a user-friendly command-line interface for initialization, build, apply,
 - `verify`
 - `update`
 - `doctor`
+- `proxifier bundles`
+- `proxifier scaffold`
 - `schedule install`
 - `schedule remove`
 
@@ -28,6 +31,8 @@ Provide a user-friendly command-line interface for initialization, build, apply,
 - `setup` should be able to continue into a foreground `sing-box` run after a successful onboarding flow.
 - `setup` should be able to open isolated visible browser windows for representative verification URLs without requiring the user to configure a browser manually.
 - `setup` should be able to narrow those visible verification URLs based on the user's natural-language routing prompt.
+- `setup` should be able to generate Proxifier helper assets when the onboarding prompt implies process-aware routing intent.
+- `quickstart` must provide the shortest opinionated first-run path for npm-installed users, including config initialization, rule authoring, verification, publish, and schedule installation.
 - `author` must support intent-first rule authoring without requiring the user to understand the DSL.
 - `author` must support preview-only operation.
 - `author` may optionally trigger a closed-loop update flow after writing rules.
@@ -39,6 +44,8 @@ Provide a user-friendly command-line interface for initialization, build, apply,
 - `verify` must be able to consume user-journey scenarios from builder config, including inbound choice, target URL, and expected outbound selector or leaf.
 - `update` must perform fetch, build, validation, and apply in one flow.
 - `doctor` must surface environment gaps such as missing `sing-box`.
+- `proxifier bundles` must enumerate the supported process presets that can help users build Proxifier rules.
+- `proxifier scaffold` must generate a helper directory from the configured `in-proxifier` listener and optional prompt-derived process bundles.
 - Example and fallback listener defaults should avoid common Clash-family local ports to support side-by-side testing on macOS.
 - The distributed CLI package must be installable from an npm tarball with a working `singbox-iac` binary entrypoint.
 - Package metadata must restrict runtime contents to the compiled CLI and required docs/examples rather than shipping the whole workspace.

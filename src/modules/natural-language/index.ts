@@ -295,7 +295,8 @@ export function selectVerificationScenariosForPrompt(
         (domain) => host === domain || host.endsWith(`.${domain}`) || domain.endsWith(`.${host}`),
       );
       const matchesProcess = wantsProcess && scenario.inbound === "in-proxifier";
-      const matchesChina = wantsChinaDirect && host.endsWith("baidu.com");
+      const matchesChina =
+        wantsChinaDirect && (host.endsWith("qq.com") || host.endsWith("baidu.com"));
       const matchesAiCategory =
         wantsAiCategory &&
         [

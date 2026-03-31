@@ -126,7 +126,7 @@ describe("natural language authoring", () => {
         {
           id: "cn-direct",
           name: "China direct",
-          url: "https://www.baidu.com/favicon.ico",
+          url: "https://www.qq.com/favicon.ico",
           inbound: "in-mixed",
           expectedOutbound: "direct",
         },

@@ -1,6 +1,6 @@
 {
   "name": "@singbox-iac/cli",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Policy-first subscription compiler for sing-box on macOS.",
   "repository": {
     "type": "git",
@@ -12,7 +12,16 @@
   },
   "type": "module",
   "license": "MIT",
-  "files": ["dist", "README.md", "README-en.md", "docs", "examples", "CONTRIBUTING.md", "LICENSE"],
+  "files": [
+    "dist",
+    "assets",
+    "README.md",
+    "README-en.md",
+    "docs",
+    "examples",
+    "CONTRIBUTING.md",
+    "LICENSE"
+  ],
   "bin": {
     "singbox-iac": "dist/cli/index.js"
   },

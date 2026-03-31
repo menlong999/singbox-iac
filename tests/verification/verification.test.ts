@@ -12,10 +12,11 @@ describe("verification helpers", () => {
       log: { level: "info" },
       dns: {
         servers: [
+          { type: "local", tag: "dns-local-default", prefer_go: true },
           { type: "udp", tag: "dns-remote-primary", server: "1.1.1.1", server_port: 53 },
           { type: "udp", tag: "dns-remote-cn", server: "223.5.5.5", server_port: 53 },
         ],
-        final: "dns-remote-primary",
+        final: "dns-local-default",
         strategy: "prefer_ipv4",
       },
       inbounds: [
@@ -85,7 +86,7 @@ describe("verification helpers", () => {
         ],
         final: "Global",
         auto_detect_interface: true,
-        default_domain_resolver: "dns-remote-primary",
+        default_domain_resolver: "dns-local-default",
       },
     };
 
@@ -101,8 +102,49 @@ describe("verification helpers", () => {
         (outbound) => outbound.tag === "Global",
       )?.type,
     ).toBe("selector");
+    expect((prepared.config.dns as { final: string }).final).toBe("dns-local-verify");
+    expect(
+      (
+        prepared.config.dns as {
+          servers: Array<{ type: string; tag: string; prefer_go?: boolean }>;
+        }
+      ).servers[0],
+    ).toMatchObject({
+      type: "local",
+      tag: "dns-local-verify",
+      prefer_go: true,
+    });
+    expect(
+      (prepared.config.route as { default_domain_resolver: string }).default_domain_resolver,
+    ).toBe("dns-local-verify");
 
     const checks = validateConfigInvariants(baseConfig);
+    expect(checks.every((check) => check.passed)).toBe(true);
+  });
+
+  it("allows optional ruleset-driven route checks to be absent", () => {
+    const config = {
+      dns: {
+        servers: [
+          { type: "local", tag: "dns-local-default", prefer_go: true },
+          { type: "tcp", tag: "dns-remote-primary", server: "1.1.1.1", server_port: 53 },
+          { type: "tcp", tag: "dns-remote-cn", server: "223.5.5.5", server_port: 53 },
+        ],
+      },
+      route: {
+        default_domain_resolver: "dns-local-default",
+        rules: [
+          { action: "sniff" },
+          { network: "udp", port: 443, action: "reject" },
+          { protocol: "dns", action: "hijack-dns" },
+          { inbound: ["in-proxifier"], action: "route", outbound: "Process-Proxy" },
+          { domain_suffix: ["stitch.withgoogle.com"], action: "route", outbound: "Stitch-Out" },
+          { domain_suffix: ["openai.com", "chatgpt.com"], action: "route", outbound: "AI-Out" },
+        ],
+      },
+    };
+
+    const checks = validateConfigInvariants(config);
     expect(checks.every((check) => check.passed)).toBe(true);
   });
 });

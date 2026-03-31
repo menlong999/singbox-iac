@@ -11,6 +11,8 @@ import { registerBuildCommand } from "./commands/build.js";
 import { registerCheckCommand } from "./commands/check.js";
 import { registerDoctorCommand } from "./commands/doctor.js";
 import { registerInitCommand } from "./commands/init.js";
+import { registerProxifierCommand } from "./commands/proxifier.js";
+import { registerQuickstartCommand } from "./commands/quickstart.js";
 import { registerReloadCommand } from "./commands/reload.js";
 import { registerRunCommand } from "./commands/run.js";
 import { registerScheduleCommand } from "./commands/schedule.js";
@@ -29,6 +31,7 @@ export function createProgram(): Command {
 
   registerInitCommand(program);
   registerSetupCommand(program);
+  registerQuickstartCommand(program);
   registerAuthorCommand(program);
   registerBuildCommand(program);
   registerCheckCommand(program);
@@ -37,6 +40,7 @@ export function createProgram(): Command {
   registerVerifyCommand(program);
   registerUpdateCommand(program);
   registerDoctorCommand(program);
+  registerProxifierCommand(program);
   registerReloadCommand(program);
   registerScheduleCommand(program);
   registerTemplatesCommand(program);

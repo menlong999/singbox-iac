@@ -19,7 +19,7 @@ The target runtime is a headless macOS deployment:
 ## Current CLI Flow
 
 ```bash
-singbox-iac setup --subscription-url '<url>'
+singbox-iac quickstart --subscription-url '<url>' --prompt '<一句话策略>'
 singbox-iac init
 singbox-iac doctor
 singbox-iac build
@@ -47,8 +47,9 @@ The tool must never overwrite the live config with an unchecked file.
 For npm-installed users, the preferred onboarding path is now:
 
 ```bash
-singbox-iac setup --subscription-url '<url>' --prompt '<一句话策略>'
-singbox-iac run
+singbox-iac quickstart --subscription-url '<url>' --prompt '<一句话策略>'
 ```
 
-That flow avoids manually chaining `init`, local ruleset downloads, and the first `build`.
+That flow avoids manually chaining `init`, local ruleset downloads, route verification, and the first publish.
+
+If the prompt includes process-aware intent such as `Proxifier`, `进程级`, `Antigravity`, or `Cursor`, the onboarding flow should also generate `~/.config/singbox-iac/proxifier/` helper files so the user can set up process-level routing without manually reverse-engineering app process names.

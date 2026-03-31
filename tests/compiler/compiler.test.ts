@@ -168,10 +168,11 @@ describe("compileConfig", () => {
       { tag: "in-proxifier", listen: "127.0.0.1", listen_port: 39091 },
     ]);
     expect(dns.servers).toMatchObject([
-      { type: "udp", tag: "dns-remote-primary", server: "1.1.1.1", server_port: 53 },
-      { type: "udp", tag: "dns-remote-cn", server: "223.5.5.5", server_port: 53 },
+      { type: "local", tag: "dns-local-default", prefer_go: true },
+      { type: "tcp", tag: "dns-remote-primary", server: "1.1.1.1", server_port: 53 },
+      { type: "tcp", tag: "dns-remote-cn", server: "223.5.5.5", server_port: 53 },
     ]);
-    expect(dns.final).toBe("dns-remote-primary");
+    expect(dns.final).toBe("dns-local-default");
     expect(dns.strategy).toBe("prefer_ipv4");
 
     expect(route.rules[0]).toMatchObject({ action: "sniff" });
@@ -208,7 +209,7 @@ describe("compileConfig", () => {
       outbound: "direct",
     });
     expect(route.final).toBe("Global");
-    expect(route.default_domain_resolver).toBe("dns-remote-primary");
+    expect(route.default_domain_resolver).toBe("dns-local-default");
   });
 
   it("inserts custom DSL rules before built-ins and validates their outbound targets", () => {

@@ -62,7 +62,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    A["用户提供订阅地址 + 一句话需求"] --> B["setup"]
+    A["用户提供订阅地址 + 一句话需求"] --> B["quickstart / setup --ready"]
     B --> C["检测本地环境<br/>macOS / sing-box / Chrome / AI CLI"]
     C --> D["根据意图生成规则"]
     D --> E["同步本地 rule set"]
@@ -161,21 +161,25 @@ singbox-iac --help
 ### 一步完成初始化
 
 ```bash
-singbox-iac setup \
+singbox-iac quickstart \
   --subscription-url '你的机场订阅地址' \
   --prompt 'GitHub 这类开发类走香港，Antigravity 进程级走美国，Gemini 走新加坡，每30分钟自动更新'
 ```
 
-`setup` 会自动：
+`quickstart` 会自动：
 
 - 生成 `~/.config/singbox-iac/builder.config.yaml`
 - 生成 `~/.config/singbox-iac/rules/custom.rules.yaml`
+- 生成 `~/.config/singbox-iac/proxifier/` 辅助文件
 - 检查本地环境
-- 下载默认本地 `.srs` 规则集
+- 使用包内内置的默认 `.srs` 规则集，并在需要时补充同步
 - 把一句自然语言转成路由规则
 - 构建 `~/.config/singbox-iac/generated/config.staging.json`
+- 验证关键路由
+- 发布 live config
+- 安装定时更新
 
-如果你希望首次安装时尽可能自动化，可以这样：
+如果你希望保留更细的步骤控制，也可以继续用：
 
 ```bash
 singbox-iac setup \
@@ -184,11 +188,10 @@ singbox-iac setup \
   --ready
 ```
 
-`--ready` 会额外执行：
+`setup --ready` 和 `quickstart` 的主要区别是：
 
-- 路由验证
-- 发布 live config
-- 安装定时更新
+- `quickstart` 更偏默认的一键上手
+- `setup --ready` 更适合你还想自己决定是否运行、是否开浏览器、是否写 Proxifier 辅助目录
 
 ### 前台运行测试
 
@@ -245,6 +248,30 @@ singbox-iac author \
 - 写入前先 preview
 - 生成规则后直接闭环 update
 
+## Proxifier 上手
+
+如果你的 AI IDE、language server 或桌面应用不走系统代理，可以直接使用自动生成的 Proxifier 辅助目录：
+
+```text
+~/.config/singbox-iac/proxifier/
+```
+
+其中会包含：
+
+- `README.md`
+- `proxy-endpoint.txt`
+- `custom-processes.txt`
+- `bundles/antigravity.txt`
+- `bundles/cursor.txt`
+- `bundles/developer-ai-cli.txt`
+- `all-processes.txt`
+
+如果你只想重新生成这部分，不需要重跑全部 onboarding：
+
+```bash
+singbox-iac proxifier scaffold --prompt 'Antigravity 进程级走美国，Cursor 也走独立入口'
+```
+
 ## 它和 sing-box 是怎么配合的
 
 它不会替代 `sing-box` 内核本身，而是负责生成和维护 `sing-box` 配置。
@@ -282,6 +309,7 @@ singbox-iac author \
 ```bash
 singbox-iac init
 singbox-iac setup
+singbox-iac quickstart
 singbox-iac author
 singbox-iac build
 singbox-iac check
@@ -290,6 +318,8 @@ singbox-iac run
 singbox-iac verify
 singbox-iac update
 singbox-iac doctor
+singbox-iac proxifier bundles
+singbox-iac proxifier scaffold
 singbox-iac schedule install
 singbox-iac schedule remove
 singbox-iac templates list
@@ -300,6 +330,7 @@ singbox-iac templates list
 - [rules-dsl.md](./docs/rules-dsl.md)
 - [rule-templates.md](./docs/rule-templates.md)
 - [natural-language-authoring.md](./docs/natural-language-authoring.md)
+- [proxifier-onboarding.md](./docs/proxifier-onboarding.md)
 - [runtime-on-macos.md](./docs/runtime-on-macos.md)
 - [openspec/project.md](./openspec/project.md)
 

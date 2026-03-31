@@ -40,7 +40,7 @@ const devCommonRuleSetTags = new Set([
   "geosite-figma",
 ]);
 
-const defaultDnsServerTag = "dns-remote-primary";
+const defaultDnsServerTag = "dns-local-default";
 
 export function compileConfig(input: CompileConfigInput): BuildArtifact {
   if (input.nodes.length === 0) {
@@ -198,13 +198,18 @@ export function compileConfig(input: CompileConfigInput): BuildArtifact {
     dns: {
       servers: [
         {
-          type: "udp",
+          type: "local",
           tag: defaultDnsServerTag,
+          prefer_go: true,
+        },
+        {
+          type: "tcp",
+          tag: "dns-remote-primary",
           server: "1.1.1.1",
           server_port: 53,
         },
         {
-          type: "udp",
+          type: "tcp",
           tag: "dns-remote-cn",
           server: "223.5.5.5",
           server_port: 53,
