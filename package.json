@@ -12,7 +12,7 @@
   },
   "type": "module",
   "license": "MIT",
-  "files": ["dist", "README.md", "docs", "examples", "CONTRIBUTING.md", "LICENSE"],
+  "files": ["dist", "README.md", "README-en.md", "docs", "examples", "CONTRIBUTING.md", "LICENSE"],
   "bin": {
     "singbox-iac": "dist/cli/index.js"
   },
