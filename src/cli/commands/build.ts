@@ -100,7 +100,7 @@ async function resolveBuildConfig(options: BuildCommandOptions): Promise<Builder
       processProxy: {
         type: "selector",
         includes: ["US", "SG", "JP", "HK"],
-        defaultNodePattern: "OnlyAI",
+        defaultTarget: "US",
       },
       aiOut: { type: "selector", includes: ["HK", "SG", "US", "JP"], defaultTarget: "HK" },
       devCommonOut: {
@@ -118,42 +118,42 @@ async function resolveBuildConfig(options: BuildCommandOptions): Promise<Builder
       scenarios: [
         {
           id: "antigravity-auth",
-          name: "Antigravity auth via proxifier stays on the OnlyAI US node",
+          name: "Antigravity auth via proxifier stays on the dedicated US path",
           url: "https://accounts.google.com/favicon.ico",
           inbound: "in-proxifier",
           expectedOutbound: "Process-Proxy",
         },
         {
           id: "antigravity-oauth",
-          name: "Antigravity OAuth metadata via proxifier stays on the OnlyAI US node",
+          name: "Antigravity OAuth metadata via proxifier stays on the dedicated US path",
           url: "https://oauth2.googleapis.com/.well-known/openid-configuration",
           inbound: "in-proxifier",
           expectedOutbound: "Process-Proxy",
         },
         {
           id: "antigravity-docs",
-          name: "Antigravity docs via proxifier stay on the OnlyAI US node",
+          name: "Antigravity docs via proxifier stay on the dedicated US path",
           url: "https://antigravity.google/docs",
           inbound: "in-proxifier",
           expectedOutbound: "Process-Proxy",
         },
         {
           id: "antigravity-rules-docs",
-          name: "Antigravity rules docs via proxifier stay on the OnlyAI US node",
+          name: "Antigravity rules docs via proxifier stay on the dedicated US path",
           url: "https://antigravity.google/docs/rules",
           inbound: "in-proxifier",
           expectedOutbound: "Process-Proxy",
         },
         {
           id: "antigravity-mcp-docs",
-          name: "Antigravity MCP docs via proxifier stay on the OnlyAI US node",
+          name: "Antigravity MCP docs via proxifier stay on the dedicated US path",
           url: "https://antigravity.google/docs/mcp",
           inbound: "in-proxifier",
           expectedOutbound: "Process-Proxy",
         },
         {
           id: "antigravity-google-apis",
-          name: "Antigravity Google API discovery traffic via proxifier stays on the OnlyAI US node",
+          name: "Antigravity Google API discovery traffic via proxifier stays on the dedicated US path",
           url: "https://www.googleapis.com/discovery/v1/apis",
           inbound: "in-proxifier",
           expectedOutbound: "Process-Proxy",

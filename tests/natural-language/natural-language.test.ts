@@ -7,6 +7,7 @@ import YAML from "yaml";
 
 import {
   generateRulesFromPrompt,
+  selectVerificationScenariosForPrompt,
   updateBuilderAuthoring,
 } from "../../src/modules/natural-language/index.js";
 
@@ -67,7 +68,7 @@ describe("natural language authoring", () => {
 
     expect(plan.groupDefaults?.devCommonOut?.defaultTarget).toBe("HK");
     expect(plan.groupDefaults?.processProxy?.defaultTarget).toBe("US");
-    expect(plan.groupDefaults?.processProxy?.defaultNodePattern).toBe("OnlyAI");
+    expect(plan.groupDefaults?.processProxy?.defaultNodePattern).toBeUndefined();
     expect(
       plan.beforeBuiltins.some((rule) => rule.domainSuffix?.includes("gemini.google.com")),
     ).toBe(true);
@@ -81,6 +82,64 @@ describe("natural language authoring", () => {
           override.expectedOutbound === "SG",
       ),
     ).toBe(true);
+  });
+
+  it("keeps OnlyAI pinning available when the prompt asks for it explicitly", () => {
+    const plan = generateRulesFromPrompt("Antigravity 进程级走美国 OnlyAI 节点");
+
+    expect(plan.groupDefaults?.processProxy?.defaultTarget).toBe("US");
+    expect(plan.groupDefaults?.processProxy?.defaultNodePattern).toBe("OnlyAI");
+  });
+
+  it("selects visible verification scenarios from a natural-language prompt", () => {
+    const selected = selectVerificationScenariosForPrompt(
+      "我需要给 proxifier 单独设置进程级的入口，出口到美国；所有 ai 类、开发工具网站类，出口到香港节点；google stitch 相关出口到美国；国内直连",
+      [
+        {
+          id: "antigravity-auth",
+          name: "Antigravity auth",
+          url: "https://accounts.google.com/favicon.ico",
+          inbound: "in-proxifier",
+          expectedOutbound: "Process-Proxy",
+        },
+        {
+          id: "stitch-us",
+          name: "Stitch",
+          url: "https://stitch.withgoogle.com/favicon.ico",
+          inbound: "in-mixed",
+          expectedOutbound: "Stitch-Out",
+        },
+        {
+          id: "chatgpt-hk",
+          name: "ChatGPT",
+          url: "https://chatgpt.com/favicon.ico",
+          inbound: "in-mixed",
+          expectedOutbound: "AI-Out",
+        },
+        {
+          id: "github-hk",
+          name: "GitHub",
+          url: "https://github.com/favicon.ico",
+          inbound: "in-mixed",
+          expectedOutbound: "Dev-Common-Out",
+        },
+        {
+          id: "cn-direct",
+          name: "China direct",
+          url: "https://www.baidu.com/favicon.ico",
+          inbound: "in-mixed",
+          expectedOutbound: "direct",
+        },
+      ],
+    );
+
+    expect(selected.map((scenario) => scenario.id)).toEqual([
+      "antigravity-auth",
+      "stitch-us",
+      "chatgpt-hk",
+      "github-hk",
+      "cn-direct",
+    ]);
   });
 
   it("updates builder config authoring fields in place", async () => {

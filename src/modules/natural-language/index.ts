@@ -34,6 +34,14 @@ export interface NaturalLanguagePlan {
   readonly verificationOverrides?: readonly NaturalLanguageVerificationOverride[];
 }
 
+export interface PromptSelectableVerificationScenario {
+  readonly id: string;
+  readonly name: string;
+  readonly url: string;
+  readonly inbound: "in-mixed" | "in-proxifier";
+  readonly expectedOutbound: string;
+}
+
 const siteAliasDefinitions = [
   { aliases: ["openrouter"], domains: ["openrouter.ai"] },
   { aliases: ["perplexity"], domains: ["perplexity.ai"] },
@@ -73,6 +81,8 @@ const categoryTemplateDefinitions = [
     aliases: [
       "ai工具",
       "ai 工具",
+      "ai类",
+      "ai 类",
       "ai tools",
       "third-party ai",
       "developer ai",
@@ -82,7 +92,15 @@ const categoryTemplateDefinitions = [
     templateId: "developer-ai-sites",
   },
   {
-    aliases: ["开发者网站", "开发工具网站", "developer sites", "developer tools", "dev sites"],
+    aliases: [
+      "开发者网站",
+      "开发者网站类",
+      "开发工具网站",
+      "开发工具网站类",
+      "developer sites",
+      "developer tools",
+      "dev sites",
+    ],
     templateId: "developer-common-sites",
   },
   {
@@ -168,7 +186,10 @@ export function generateRulesFromPrompt(prompt: string): NaturalLanguagePlan {
         groupDefaults.processProxy = {
           ...groupDefaults.processProxy,
           defaultTarget: route,
-          ...(clause.includes("onlyai") || clause.includes("美国") || clause.includes("us")
+          ...(clause.includes("onlyai") ||
+          clause.includes("only ai") ||
+          clause.includes("专用ai") ||
+          clause.includes("专用 ai")
             ? { defaultNodePattern: "OnlyAI" }
             : {}),
         };
@@ -228,6 +249,87 @@ export function generateRulesFromPrompt(prompt: string): NaturalLanguagePlan {
     ...(Object.keys(groupDefaults).length > 0 ? { groupDefaults } : {}),
     ...(verificationOverrides.length > 0 ? { verificationOverrides } : {}),
   };
+}
+
+export function selectVerificationScenariosForPrompt(
+  prompt: string,
+  scenarios: readonly PromptSelectableVerificationScenario[],
+): readonly PromptSelectableVerificationScenario[] {
+  const text = normalizePrompt(prompt);
+  const clauses = splitClauses(text);
+  const selected = new Map<string, PromptSelectableVerificationScenario>();
+
+  for (const clause of clauses) {
+    const requestedDomains = new Set<string>();
+
+    for (const definition of siteAliasDefinitions) {
+      if (definition.aliases.some((alias) => clause.includes(alias))) {
+        for (const domain of definition.domains) {
+          requestedDomains.add(domain);
+        }
+      }
+    }
+
+    for (const domain of extractExplicitDomains(clause)) {
+      requestedDomains.add(domain);
+    }
+
+    const wantsProcess = processAliasDefinitions.some((alias) => clause.includes(alias));
+    const wantsChinaDirect =
+      clause.includes("国内") ||
+      clause.includes("中国") ||
+      clause.includes("大陆") ||
+      clause.includes("直连") ||
+      clause.includes("direct");
+    const wantsAiCategory = hasTemplateAlias(clause, "developer-ai-sites");
+    const wantsDeveloperCategory =
+      hasTemplateAlias(clause, "developer-common-sites") ||
+      clause.includes("github") ||
+      clause.includes("google 服务") ||
+      clause.includes("google services") ||
+      clause.includes("google");
+
+    for (const scenario of scenarios) {
+      const host = new URL(scenario.url).hostname.toLowerCase();
+      const matchesExplicitDomain = [...requestedDomains].some(
+        (domain) => host === domain || host.endsWith(`.${domain}`) || domain.endsWith(`.${host}`),
+      );
+      const matchesProcess = wantsProcess && scenario.inbound === "in-proxifier";
+      const matchesChina = wantsChinaDirect && host.endsWith("baidu.com");
+      const matchesAiCategory =
+        wantsAiCategory &&
+        [
+          "chatgpt.com",
+          "openai.com",
+          "gemini.google.com",
+          "anthropic.com",
+          "claude.ai",
+          "openrouter.ai",
+          "perplexity.ai",
+        ].some((domain) => host === domain || host.endsWith(`.${domain}`));
+      const matchesDeveloperCategory =
+        wantsDeveloperCategory &&
+        ["github.com", "githubusercontent.com", "google.com", "googleapis.com", "gstatic.com"].some(
+          (domain) => host === domain || host.endsWith(`.${domain}`),
+        );
+
+      if (
+        matchesExplicitDomain ||
+        matchesProcess ||
+        matchesChina ||
+        matchesAiCategory ||
+        matchesDeveloperCategory
+      ) {
+        selected.set(scenario.id, scenario);
+      }
+    }
+  }
+
+  if (selected.size === 0) {
+    return scenarios.slice(0, Math.min(3, scenarios.length));
+  }
+
+  return scenarios.filter((scenario) => selected.has(scenario.id));
 }
 
 export async function writeGeneratedRules(input: {

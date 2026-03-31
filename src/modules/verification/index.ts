@@ -38,9 +38,23 @@ export interface VerificationReport {
   readonly verifyConfigPath: string;
   readonly logPath: string;
   readonly singBoxBinary: string;
-  readonly chromeBinary: string;
+  readonly requestBinary: string;
   readonly checks: readonly VerificationCheckResult[];
   readonly scenarios: readonly VerificationScenarioResult[];
+}
+
+export interface VisibleVerificationScenario {
+  readonly id: string;
+  readonly name: string;
+  readonly url: string;
+  readonly inbound: "in-mixed" | "in-proxifier";
+}
+
+export interface VisibleChromeLaunch {
+  readonly inbound: "in-mixed" | "in-proxifier";
+  readonly proxyPort: number;
+  readonly urls: readonly string[];
+  readonly userDataDir: string;
 }
 
 export function assertVerificationReportPassed(report: VerificationReport): void {
@@ -81,7 +95,7 @@ export interface ConfiguredVerificationScenario {
   readonly expectedOutbound: BuilderConfig["verification"]["scenarios"][number]["expectedOutbound"];
 }
 
-interface ChromeRunResult {
+interface RequestRunResult {
   readonly exitCode: number;
   readonly stdout: string;
   readonly stderr: string;
@@ -92,7 +106,7 @@ export async function verifyConfigRoutes(
   input: VerifyConfigRoutesInput,
 ): Promise<VerificationReport> {
   const singBoxBinary = await resolveSingBoxBinary(input.singBoxBinary);
-  const chromeBinary = await resolveChromeBinary(input.chromeBinary);
+  const requestBinary = await resolveCurlBinary();
   const rawConfig = JSON.parse(await readFile(input.configPath, "utf8")) as JsonObject;
 
   const checks = validateConfigInvariants(rawConfig);
@@ -158,11 +172,10 @@ export async function verifyConfigRoutes(
     const results: VerificationScenarioResult[] = [];
     for (const scenario of scenarios) {
       const offset = logBuffer.text.length;
-      const chromeResult = await runChromeScenario({
-        chromeBinary,
+      const requestResult = await runProxyRequestScenario({
+        requestBinary,
         proxyPort: scenario.proxyPort,
         url: scenario.url,
-        workdir: runDir,
       });
 
       const expectedLog =
@@ -190,15 +203,15 @@ export async function verifyConfigRoutes(
         [inboundLog, expectedLog],
         20_000,
       );
-      const chromeFailure = detectChromeFailure(chromeResult);
+      const requestFailure = detectRequestFailure(requestResult);
 
       results.push({
         name: scenario.name,
-        passed: excerpt !== undefined && chromeFailure === undefined,
+        passed: excerpt !== undefined && requestFailure === undefined,
         details:
-          excerpt !== undefined && chromeFailure === undefined
+          excerpt !== undefined && requestFailure === undefined
             ? excerpt.trim()
-            : (chromeFailure ??
+            : (requestFailure ??
               `Expected logs were not observed for ${new URL(scenario.url).hostname} within the timeout.`),
         url: scenario.url,
         inboundTag: scenario.inboundTag,
@@ -211,7 +224,7 @@ export async function verifyConfigRoutes(
       verifyConfigPath,
       logPath,
       singBoxBinary,
-      chromeBinary,
+      requestBinary,
       checks,
       scenarios: results,
     };
@@ -240,6 +253,76 @@ export async function resolveChromeBinary(explicitPath?: string): Promise<string
   throw new Error(
     "Unable to find a usable Chrome binary. Set CHROME_BIN or install Google Chrome.",
   );
+}
+
+export async function openVisibleChromeWindows(input: {
+  readonly scenarios: readonly VisibleVerificationScenario[];
+  readonly mixedPort: number;
+  readonly proxifierPort: number;
+  readonly chromeBinary?: string;
+}): Promise<readonly VisibleChromeLaunch[]> {
+  const chromeBinary = await resolveChromeBinary(input.chromeBinary);
+  const byInbound = new Map<"in-mixed" | "in-proxifier", VisibleVerificationScenario[]>();
+
+  for (const scenario of input.scenarios) {
+    const current = byInbound.get(scenario.inbound) ?? [];
+    current.push(scenario);
+    byInbound.set(scenario.inbound, current);
+  }
+
+  const launches: VisibleChromeLaunch[] = [];
+
+  for (const [inbound, scenarios] of byInbound) {
+    const profileDir = await mkdtemp(path.join(tmpdir(), "singbox-iac-visible-"));
+    const proxyPort = inbound === "in-proxifier" ? input.proxifierPort : input.mixedPort;
+    const urls = [...new Set(scenarios.map((scenario) => scenario.url))];
+    const args = [
+      "--new-window",
+      "--disable-background-networking",
+      "--disable-default-apps",
+      "--disable-sync",
+      "--no-first-run",
+      "--no-default-browser-check",
+      `--user-data-dir=${profileDir}`,
+      `--proxy-server=http://127.0.0.1:${proxyPort}`,
+      ...urls,
+    ];
+
+    const child = spawn(chromeBinary, args, {
+      detached: true,
+      stdio: "ignore",
+    });
+    child.unref();
+
+    launches.push({
+      inbound,
+      proxyPort,
+      urls,
+      userDataDir: profileDir,
+    });
+  }
+
+  return launches;
+}
+
+export async function resolveCurlBinary(explicitPath?: string): Promise<string> {
+  const candidates = [
+    explicitPath,
+    process.env.CURL_BIN,
+    "/usr/bin/curl",
+    "/bin/curl",
+    ...resolvePathCandidates("curl"),
+  ].filter(
+    (candidate): candidate is string => typeof candidate === "string" && candidate.length > 0,
+  );
+
+  for (const candidate of candidates) {
+    if (await isExecutable(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error("Unable to find a usable curl binary for route verification.");
 }
 
 export async function prepareVerificationConfig(
@@ -497,34 +580,27 @@ const defaultConfiguredScenarios: readonly ConfiguredVerificationScenario[] = [
   },
 ];
 
-async function runChromeScenario(input: {
-  readonly chromeBinary: string;
+async function runProxyRequestScenario(input: {
+  readonly requestBinary: string;
   readonly proxyPort: number;
   readonly url: string;
-  readonly workdir: string;
-}): Promise<ChromeRunResult> {
-  const scenarioDir = await mkdtemp(path.join(input.workdir, "chrome-"));
+}): Promise<RequestRunResult> {
   const args = [
-    "--headless=new",
-    "--disable-gpu",
-    "--disable-background-networking",
-    "--disable-default-apps",
-    "--disable-extensions",
-    "--disable-sync",
-    "--disable-component-update",
-    "--metrics-recording-only",
-    "--mute-audio",
-    "--no-first-run",
-    "--no-default-browser-check",
-    "--virtual-time-budget=6000",
-    `--user-data-dir=${scenarioDir}`,
-    `--proxy-server=http://127.0.0.1:${input.proxyPort}`,
-    "--dump-dom",
+    "--silent",
+    "--show-error",
+    "--location",
+    "--head",
+    "--max-time",
+    "12",
+    "--connect-timeout",
+    "5",
+    "--proxy",
+    `http://127.0.0.1:${input.proxyPort}`,
     input.url,
   ];
 
-  return new Promise<ChromeRunResult>((resolve, reject) => {
-    const child = spawn(input.chromeBinary, args, {
+  return new Promise<RequestRunResult>((resolve, reject) => {
+    const child = spawn(input.requestBinary, args, {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -534,7 +610,7 @@ async function runChromeScenario(input: {
     const timeout = setTimeout(() => {
       timedOut = true;
       child.kill("SIGKILL");
-    }, 8_000);
+    }, 12_000);
 
     child.stdout.on("data", (chunk: Buffer | string) => {
       stdout += chunk.toString();
@@ -558,14 +634,13 @@ async function runChromeScenario(input: {
   });
 }
 
-function detectChromeFailure(result: ChromeRunResult): string | undefined {
+function detectRequestFailure(result: RequestRunResult): string | undefined {
   if (result.exitCode !== 0 && !result.timedOut) {
-    return `Chrome exited with code ${result.exitCode}.`;
+    return `Proxy request exited with code ${result.exitCode}.\n${`${result.stdout}\n${result.stderr}`.trim()}`;
   }
 
-  const output = `${result.stdout}\n${result.stderr}`;
-  if (/ERR_[A-Z_]+/.test(output) || /This site can.t be reached/i.test(output)) {
-    return output.trim();
+  if (result.timedOut) {
+    return "Proxy request timed out.";
   }
 
   return undefined;
@@ -657,6 +732,14 @@ async function isExecutable(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function resolvePathCandidates(commandName: string): string[] {
+  return (process.env.PATH ?? "")
+    .split(path.delimiter)
+    .filter((entry) => entry.length > 0)
+    .map((entry) => path.join(entry, commandName))
+    .filter((candidate, index, items) => items.indexOf(candidate) === index);
 }
 
 async function sleep(ms: number): Promise<void> {

@@ -74,4 +74,4 @@ The current verification harness uses:
 - `https://antigravity.google/docs/mcp`
 - `https://www.googleapis.com/discovery/v1/apis`
 
-All of these are routed through `in-proxifier` and must land on the fixed US `OnlyAI` node.
+All of these are routed through `in-proxifier` and must land on the fixed US process-proxy path. If the operator explicitly asks for an `OnlyAI` node, the process path can pin to that node; otherwise the default US group is safer for first-run onboarding.

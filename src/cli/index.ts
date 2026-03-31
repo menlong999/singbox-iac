@@ -25,7 +25,7 @@ export function createProgram(): Command {
   program
     .name("singbox-iac")
     .description("Policy-first subscription compiler for sing-box on macOS.")
-    .version("0.1.0");
+    .version("0.1.3");
 
   registerInitCommand(program);
   registerSetupCommand(program);

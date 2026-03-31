@@ -1,5 +1,7 @@
+import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { access } from "node:fs/promises";
+import net from "node:net";
 import path from "node:path";
 
 import type { Command } from "commander";
@@ -9,9 +11,10 @@ import { generateAuthoringPlan } from "../../modules/authoring/index.js";
 import { buildConfigArtifact } from "../../modules/build/index.js";
 import { runDoctor } from "../../modules/doctor/index.js";
 import { initWorkspace } from "../../modules/init/index.js";
-import { applyConfig } from "../../modules/manager/index.js";
+import { applyConfig, checkConfig, resolveSingBoxBinary } from "../../modules/manager/index.js";
 import {
   applyPlanToBuilderConfig,
+  selectVerificationScenariosForPrompt,
   updateBuilderAuthoring,
   writeGeneratedRules,
 } from "../../modules/natural-language/index.js";
@@ -20,6 +23,7 @@ import { installLaunchdSchedule } from "../../modules/schedule/index.js";
 import {
   type VerificationReport,
   assertVerificationReportPassed,
+  openVisibleChromeWindows,
   verifyConfigRoutes,
 } from "../../modules/verification/index.js";
 import {
@@ -59,6 +63,8 @@ export function registerSetupCommand(program: Command): void {
     .option("--verify", "run runtime verification after the initial build")
     .option("--apply", "publish the generated config to the configured live path")
     .option("--reload", "reload sing-box after a successful publish")
+    .option("--run", "run sing-box in the foreground after setup completes")
+    .option("--open-browser", "open isolated Chrome windows for prompt-relevant verification URLs")
     .option(
       "--ready",
       "run the guided first-run activation flow: doctor, verify, publish, and install the schedule",
@@ -167,9 +173,15 @@ export function registerSetupCommand(program: Command): void {
       const shouldVerify = options.verify === true || options.ready === true;
       const shouldApply = options.apply === true || options.ready === true;
       const shouldInstallSchedule = options.installSchedule === true || options.ready === true;
+      const shouldRun = options.run === true;
+      const shouldOpenBrowser =
+        options.openBrowser === true || (options.ready === true && options.run === true);
 
       if (options.skipBuild && (shouldVerify || shouldApply)) {
         throw new Error("setup cannot use --skip-build together with --verify or --apply.");
+      }
+      if (options.skipBuild && shouldRun) {
+        throw new Error("setup cannot use --skip-build together with --run.");
       }
 
       if (shouldDoctor) {
@@ -308,6 +320,86 @@ export function registerSetupCommand(program: Command): void {
       }
 
       process.stdout.write(`${lines.join("\n")}\n`);
+
+      if (!shouldRun || !buildSummary) {
+        return;
+      }
+
+      const runConfigPath = shouldApply ? effectiveConfig.output.livePath : buildSummary.outputPath;
+      const singBoxBinary = await resolveSingBoxBinary(
+        options.singBoxBin ? resolvePath(options.singBoxBin) : undefined,
+      );
+
+      await checkConfig({
+        configPath: runConfigPath,
+        singBoxBinary,
+      });
+
+      const child = spawn(singBoxBinary, ["run", "-c", runConfigPath], {
+        stdio: "inherit",
+      });
+
+      try {
+        await waitForPorts(
+          [
+            {
+              host: effectiveConfig.listeners.mixed.listen,
+              port: effectiveConfig.listeners.mixed.port,
+            },
+            {
+              host: effectiveConfig.listeners.proxifier.listen,
+              port: effectiveConfig.listeners.proxifier.port,
+            },
+          ],
+          15_000,
+        );
+
+        if (shouldOpenBrowser) {
+          const selectedScenarios = options.prompt
+            ? selectVerificationScenariosForPrompt(
+                options.prompt,
+                effectiveConfig.verification.scenarios,
+              )
+            : effectiveConfig.verification.scenarios.slice(
+                0,
+                Math.min(3, effectiveConfig.verification.scenarios.length),
+              );
+
+          const visibleScenarios = selectedScenarios.map((scenario) => ({
+            id: scenario.id,
+            name: scenario.name,
+            url: scenario.url,
+            inbound: scenario.inbound,
+          }));
+          const launches = await openVisibleChromeWindows({
+            scenarios: visibleScenarios,
+            mixedPort: effectiveConfig.listeners.mixed.port,
+            proxifierPort: effectiveConfig.listeners.proxifier.port,
+            ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
+          });
+
+          process.stdout.write(
+            `${launches
+              .map(
+                (launch) =>
+                  `Opened Chrome for ${launch.inbound} on ${launch.urls.join(", ")} via 127.0.0.1:${launch.proxyPort}`,
+              )
+              .join("\n")}\n`,
+          );
+        }
+
+        process.stdout.write(`Running sing-box in foreground: ${runConfigPath}\n`);
+
+        const exitCode = await new Promise<number>((resolve, reject) => {
+          child.on("error", reject);
+          child.on("close", (code) => resolve(code ?? 0));
+        });
+        process.exitCode = exitCode;
+      } finally {
+        if (!child.killed && child.exitCode === null) {
+          child.kill("SIGINT");
+        }
+      }
     });
 }
 
@@ -327,6 +419,8 @@ interface SetupCommandOptions {
   readonly verify?: boolean;
   readonly apply?: boolean;
   readonly reload?: boolean;
+  readonly run?: boolean;
+  readonly openBrowser?: boolean;
   readonly ready?: boolean;
   readonly singBoxBin?: string;
   readonly chromeBin?: string;
@@ -372,4 +466,45 @@ async function pathExists(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function waitForPorts(
+  ports: ReadonlyArray<{
+    host: string;
+    port: number;
+  }>,
+  timeoutMs: number,
+): Promise<void> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const allReady = await Promise.all(ports.map((entry) => isTcpPortOpen(entry.host, entry.port)));
+    if (allReady.every(Boolean)) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  throw new Error(
+    `Timed out waiting for local listeners: ${ports
+      .map((entry) => `${entry.host}:${entry.port}`)
+      .join(", ")}`,
+  );
+}
+
+async function isTcpPortOpen(host: string, port: number): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const socket = net.createConnection({ host, port });
+    socket.setTimeout(500);
+    socket.on("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.on("timeout", () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.on("error", () => {
+      resolve(false);
+    });
+  });
 }
