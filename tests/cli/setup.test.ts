@@ -71,6 +71,8 @@ describe("setup command", () => {
     );
     const geositeCnPath = path.join(homeDir, ".config", "sing-box", "rule-set", "geosite-cn.srs");
 
+    const output = writeSpy.mock.calls.map((call) => String(call[0])).join("");
+
     expect(existsSync(configPath)).toBe(true);
     expect(existsSync(rulesPath)).toBe(true);
     expect(existsSync(stagingPath)).toBe(true);
@@ -79,6 +81,7 @@ describe("setup command", () => {
     expect(readFileSync(configPath, "utf8")).toContain("intervalMinutes: 45");
     expect(readFileSync(rulesPath, "utf8")).toContain("github.com");
     expect(readFileSync(stagingPath, "utf8")).toContain('"type": "trojan"');
+    expect(output).toContain("Doctor:");
     expect(writeSpy).toHaveBeenCalled();
   });
 });

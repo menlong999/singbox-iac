@@ -23,6 +23,8 @@ Provide a user-friendly command-line interface for initialization, build, apply,
 
 - `init` must generate example configuration assets for the user.
 - `setup` must provide a one-step first-run path that can initialize the default config, prepare rule sets, and build a staging config.
+- `setup` should surface local environment readiness during onboarding unless the user explicitly skips it.
+- `setup` should be able to run a guided activation path that includes verification and publish steps after a successful first build.
 - `author` must support intent-first rule authoring without requiring the user to understand the DSL.
 - `author` must support preview-only operation.
 - `author` may optionally trigger a closed-loop update flow after writing rules.

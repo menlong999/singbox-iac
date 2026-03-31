@@ -47,6 +47,69 @@ This project is built around a simple idea:
 
 `subscription -> parse -> compile -> verify -> apply -> schedule`
 
+## Architecture / 架构图
+
+```mermaid
+flowchart LR
+    A["Subscription URL / Local Subscription File"] --> B["Fetcher + Decoder"]
+    B --> C["Parser (Trojan links -> IR)"]
+    C --> D["Compiler"]
+    E["Natural-language intent / Simple DSL"] --> D
+    F["Built-in policy + Rule Sets (.srs)"] --> D
+    D --> G["Generated sing-box staging config"]
+    G --> H["Check + Route Verification"]
+    H --> I["Apply live config"]
+    I --> J["Reload / Run sing-box"]
+    I --> K["launchd schedule"]
+```
+
+**English**
+
+The system has three layers:
+
+- input layer: subscription, rule sets, and user intent
+- compile layer: parser, compiler, policy assembler
+- runtime layer: validation, publish, reload, and schedule
+
+**中文**
+
+这个项目本质上分三层：
+
+- 输入层：订阅、规则集、用户意图
+- 编译层：解析器、编译器、策略组装
+- 运行层：校验、发布、重载、定时任务
+
+## User Journey / 用户旅程
+
+```mermaid
+flowchart TD
+    A["User provides subscription URL + one sentence"] --> B["setup"]
+    B --> C["Detect local environment<br/>macOS / sing-box / Chrome / AI CLI"]
+    C --> D["Generate rules from intent"]
+    D --> E["Sync local rule sets"]
+    E --> F["Build staging config"]
+    F --> G["Verify critical routes"]
+    G --> H["Apply live config"]
+    H --> I["Install schedule"]
+    I --> J["User runs or reloads sing-box"]
+```
+
+Typical developer journey:
+
+1. paste subscription URL
+2. describe routing needs in one sentence
+3. let the tool generate config and verify key routes
+4. use Proxifier for process-aware apps and normal proxy for browsers
+5. let `launchd` keep the config updated
+
+典型开发者旅程：
+
+1. 填订阅地址
+2. 用一句话描述需求
+3. 自动生成配置并验证关键分流
+4. IDE / AI 应用走 Proxifier，浏览器走普通代理入口
+5. 通过 `launchd` 自动更新配置
+
 ## What It Does / 项目能做什么
 
 - Fetch Base64 Trojan subscriptions and parse share links
@@ -68,6 +131,42 @@ This project is built around a simple idea:
 - 自动同步本地 `.srs` 规则集
 - 发布配置到 `~/.config/sing-box/config.json`
 - 通过 `launchd` 做定时更新
+
+## Core Capabilities / 核心功能
+
+### 1. Natural-language authoring / 自然语言描述
+
+You can describe routing goals in plain language instead of editing raw JSON:
+
+- `GitHub 这类开发类都走香港`
+- `Antigravity 进程级走美国`
+- `Gemini 走新加坡`
+- `Apple TV 和 Netflix 走新加坡`
+
+系统会把这些意图编译成内部规则，再进一步生成 `sing-box` 配置。
+
+### 2. Minimal DSL for edge cases / 极简 DSL 用于少量例外
+
+For advanced users, a small YAML DSL still exists for fine-grained exceptions.
+
+对于高级用户，仍然保留了一个极简 YAML DSL，用于补充少量例外规则，而不是逼用户手写整份 `sing-box` JSON。
+
+### 3. Process-aware routing / 进程级分流
+
+This is one of the most important features for developer workflows.
+
+这也是很多程序员不会配、但实际非常关键的一类能力。
+
+Some AI IDEs and desktop tools do not respect the normal system proxy path. `Singbox IaC` supports a dedicated `in-proxifier` listener so that Proxifier can force selected processes through a controlled outbound path.
+
+典型用途：
+
+- `Antigravity`
+- Cursor
+- 某些 AI IDE 或 language server
+- 其他不走系统代理的桌面应用
+
+这让你可以把这些应用固定到独立入口和独立出口，而不会被普通站点规则打散。
 
 ## Typical Developer Scenarios / 典型开发者场景
 
@@ -105,13 +204,31 @@ singbox-iac setup \
   --prompt 'GitHub 这类开发类走香港，Antigravity 进程级走美国，Gemini 走新加坡，每30分钟自动更新'
 ```
 
+If you want the more guided first-run path, use:
+
+如果你希望首次安装时尽可能自动化，可以这样：
+
+```bash
+singbox-iac setup \
+  --subscription-url '你的机场订阅地址' \
+  --prompt 'GitHub 这类开发类走香港，Antigravity 进程级走美国，Gemini 走新加坡，每30分钟自动更新' \
+  --ready
+```
+
 What `setup` does:
 
 - creates `~/.config/singbox-iac/builder.config.yaml`
 - creates `~/.config/singbox-iac/rules/custom.rules.yaml`
+- checks local environment readiness
 - downloads the default local `.srs` rule sets
 - turns one sentence into routing rules
 - builds `~/.config/singbox-iac/generated/config.staging.json`
+
+With `--ready`, setup will additionally:
+
+- run verification on configured user journeys
+- publish the validated config to the live `sing-box` path
+- install the recurring update schedule
 
 `setup` 会自动：
 
@@ -152,6 +269,30 @@ singbox-iac update --reload
 singbox-iac schedule install
 ```
 
+## Security / 安全性
+
+**English**
+
+This project is designed to keep sensitive inputs local by default.
+
+- your subscription URL is stored only in your local builder config
+- generated configs are written to your local config directory
+- natural-language authoring defaults to a deterministic local parser
+- local AI CLI integration is optional
+- the repository ignores local tokens, caches, generated configs, and `.env` files
+
+**中文**
+
+这个项目默认尽量把敏感信息留在本地：
+
+- 订阅地址只保存在本地 builder config 中
+- 生成的配置写入你的本地配置目录
+- 自然语言作者层默认使用本地确定性解析器
+- 本地 AI CLI 接入是可选的，不是强制依赖
+- 仓库默认忽略本地 token、缓存、生成配置和 `.env`
+
+当前项目不会把订阅地址自动上传到任何远端服务。除非你主动配置外部 AI CLI 或外部命令，否则默认作者层不依赖外部 API。
+
 ## Natural-Language Authoring / 自然语言规则编写
 
 You do not need to learn raw `sing-box` JSON for common cases.
@@ -177,6 +318,13 @@ The authoring layer supports:
 - optional local AI CLI integration
 - preview before writing
 - closed-loop update after rule generation
+
+For developer users, this means the normal workflow can stay very simple:
+
+- one subscription URL
+- one natural-language sentence
+- one setup command
+- one update command for daily use
 
 ## Commands / 命令
 
