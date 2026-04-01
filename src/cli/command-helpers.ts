@@ -59,9 +59,9 @@ async function fileExists(filePath: string): Promise<boolean> {
 
 function getDefaultConfigCandidates(): readonly string[] {
   return [
+    getDefaultConfigPath(),
     path.resolve(process.cwd(), "builder.config.local.yaml"),
     path.resolve(process.cwd(), "builder.config.yaml"),
-    getDefaultConfigPath(),
   ];
 }
 

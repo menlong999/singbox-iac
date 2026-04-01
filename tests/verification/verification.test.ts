@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isRouteLevelProxySuccess,
   prepareVerificationConfig,
   resolveDefaultLeafOutboundTag,
   validateConfigInvariants,
@@ -146,5 +147,31 @@ describe("verification helpers", () => {
 
     const checks = validateConfigInvariants(config);
     expect(checks.every((check) => check.passed)).toBe(true);
+  });
+
+  it("treats proxifier CONNECT establishment as a route-level success for timeout-prone upstreams", () => {
+    expect(
+      isRouteLevelProxySuccess(
+        { inboundTag: "in-proxifier" },
+        {
+          exitCode: 28,
+          stdout: "HTTP/1.1 200 Connection established\n",
+          stderr: "curl: (28) SSL connection timeout",
+          timedOut: false,
+        },
+      ),
+    ).toBe(true);
+
+    expect(
+      isRouteLevelProxySuccess(
+        { inboundTag: "in-mixed" },
+        {
+          exitCode: 28,
+          stdout: "HTTP/1.1 200 Connection established\n",
+          stderr: "curl: (28) SSL connection timeout",
+          timedOut: false,
+        },
+      ),
+    ).toBe(false);
   });
 });

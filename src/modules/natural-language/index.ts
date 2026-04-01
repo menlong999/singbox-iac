@@ -186,7 +186,8 @@ export function generateRulesFromPrompt(prompt: string): NaturalLanguagePlan {
         groupDefaults.processProxy = {
           ...groupDefaults.processProxy,
           defaultTarget: route,
-          ...(clause.includes("onlyai") ||
+          ...(route === "US" ||
+          clause.includes("onlyai") ||
           clause.includes("only ai") ||
           clause.includes("专用ai") ||
           clause.includes("专用 ai")

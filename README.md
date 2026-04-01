@@ -158,6 +158,20 @@ singbox-iac --help
 
 ## 快速开始
 
+### 大多数用户只需要 3 个命令
+
+```bash
+singbox-iac go '<订阅地址>' '<一句话需求>'
+singbox-iac use '<新的需求描述>'
+singbox-iac update
+```
+
+- `go`：第一次安装时使用，一条命令完成初始化、验证、发布和定时任务准备
+- `use`：以后需求变化时使用，一句话改策略并重新应用
+- `update`：日常更新订阅并自动在运行中的 `sing-box` 上生效
+
+其余命令都可以理解为高级命令，主要用于调试、排障或更细粒度控制。
+
 ### 一步完成初始化
 
 ```bash
@@ -207,7 +221,7 @@ singbox-iac run
 ### 日常使用
 
 ```bash
-singbox-iac update --reload
+singbox-iac update
 ```
 
 这条命令会执行：
@@ -216,7 +230,7 @@ singbox-iac update --reload
 - build
 - verify
 - apply
-- optional reload
+- 如果检测到 `sing-box` 正在运行，则自动 reload
 
 ### 定时更新
 
@@ -225,6 +239,12 @@ singbox-iac schedule install
 ```
 
 ## 自然语言规则编写
+
+如果你只想“改一句话需求并立即生效”，推荐直接用更短的命令：
+
+```bash
+singbox-iac use 'GitHub 这类开发类都走香港，Gemini 走新加坡'
+```
 
 对于大多数场景，不需要手写 `sing-box` JSON，也不需要理解 DSL。
 

@@ -391,19 +391,6 @@ function resolveConfiguredDefaultTarget(
   candidateLeafTags: readonly string[],
   warnings: string[],
 ): string | undefined {
-  if (groupConfig.defaultTarget) {
-    if (
-      selectorTargets.includes(groupConfig.defaultTarget) ||
-      candidateLeafTags.includes(groupConfig.defaultTarget)
-    ) {
-      return groupConfig.defaultTarget;
-    }
-
-    warnings.push(
-      `Group "${groupTag}" requested defaultTarget "${groupConfig.defaultTarget}" but it was not available in resolved targets.`,
-    );
-  }
-
   if (groupConfig.defaultNodePattern) {
     const { defaultNodePattern } = groupConfig;
     const regex = compileCaseInsensitivePattern(defaultNodePattern, warnings, groupTag);
@@ -419,6 +406,19 @@ function resolveConfiguredDefaultTarget(
 
     warnings.push(
       `Group "${groupTag}" requested defaultNodePattern "${defaultNodePattern}" but no matching node tag was found.`,
+    );
+  }
+
+  if (groupConfig.defaultTarget) {
+    if (
+      selectorTargets.includes(groupConfig.defaultTarget) ||
+      candidateLeafTags.includes(groupConfig.defaultTarget)
+    ) {
+      return groupConfig.defaultTarget;
+    }
+
+    warnings.push(
+      `Group "${groupTag}" requested defaultTarget "${groupConfig.defaultTarget}" but it was not available in resolved targets.`,
     );
   }
 

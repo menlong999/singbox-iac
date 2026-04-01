@@ -92,6 +92,16 @@ export async function reloadRuntime(input: {
   });
 }
 
+export async function shouldAutoReloadRuntime(
+  runtime: BuilderConfig["runtime"]["reload"],
+): Promise<boolean> {
+  if (runtime.kind !== "signal" || !runtime.processName) {
+    return false;
+  }
+
+  return isProcessRunning(runtime.processName);
+}
+
 export async function resolveSingBoxBinary(explicitPath?: string): Promise<string> {
   const candidates = [
     explicitPath,
@@ -188,5 +198,16 @@ async function runCommand(command: string, args: readonly string[]): Promise<voi
       const details = [stdout.trim(), stderr.trim()].filter((value) => value.length > 0).join("\n");
       reject(new Error(details || `Command failed: ${command} ${args.join(" ")}`));
     });
+  });
+}
+
+async function isProcessRunning(processName: string): Promise<boolean> {
+  return new Promise<boolean>((resolve, reject) => {
+    const child = spawn("/usr/bin/pgrep", ["-x", processName], {
+      stdio: ["ignore", "ignore", "ignore"],
+    });
+
+    child.on("error", reject);
+    child.on("close", (code) => resolve(code === 0));
   });
 }

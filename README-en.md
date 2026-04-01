@@ -158,6 +158,20 @@ singbox-iac --help
 
 ## Quick Start
 
+### Most users only need 3 commands
+
+```bash
+singbox-iac go '<subscription-url>' '<one-sentence intent>'
+singbox-iac use '<new routing sentence>'
+singbox-iac update
+```
+
+- `go`: first-time onboarding in one command
+- `use`: change policy later with one sentence and re-apply it
+- `update`: refresh the subscription and apply the latest config
+
+Everything else can be treated as advanced commands for debugging or fine-grained control.
+
 ### One-step onboarding
 
 ```bash
@@ -207,7 +221,7 @@ Default local listeners:
 ### Day-to-day usage
 
 ```bash
-singbox-iac update --reload
+singbox-iac update
 ```
 
 That command performs:
@@ -216,7 +230,7 @@ That command performs:
 - build
 - verify
 - apply
-- optional reload
+- reload automatically when a `sing-box` process is already running
 
 ### Background schedule
 
@@ -225,6 +239,12 @@ singbox-iac schedule install
 ```
 
 ## Natural-Language Authoring
+
+If you only want to change the routing sentence and apply it immediately, use the shorter command:
+
+```bash
+singbox-iac use 'GitHub and developer sites go through Hong Kong, Gemini goes through Singapore'
+```
 
 For common cases, you do not need to learn raw `sing-box` JSON or even the DSL.
 

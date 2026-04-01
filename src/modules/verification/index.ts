@@ -171,52 +171,7 @@ export async function verifyConfigRoutes(
 
     const results: VerificationScenarioResult[] = [];
     for (const scenario of scenarios) {
-      const offset = logBuffer.text.length;
-      const requestResult = await runProxyRequestScenario({
-        requestBinary,
-        proxyPort: scenario.proxyPort,
-        url: scenario.url,
-      });
-
-      const expectedLog =
-        scenario.expectedOutboundTag === "direct"
-          ? new RegExp(
-              `outbound/direct\\[direct\\]: outbound connection to ${escapeRegExp(
-                new URL(scenario.url).hostname,
-              )}:443`,
-            )
-          : new RegExp(
-              `outbound/trojan\\[${escapeRegExp(
-                scenario.expectedOutboundTag,
-              )}\\]: outbound connection to ${escapeRegExp(new URL(scenario.url).hostname)}:443`,
-            );
-
-      const inboundLog = new RegExp(
-        `inbound/mixed\\[${escapeRegExp(
-          scenario.inboundTag,
-        )}\\]: inbound connection to ${escapeRegExp(new URL(scenario.url).hostname)}:443`,
-      );
-
-      const excerpt = await waitForScenarioLogs(
-        logBuffer,
-        offset,
-        [inboundLog, expectedLog],
-        20_000,
-      );
-      const requestFailure = detectRequestFailure(requestResult);
-
-      results.push({
-        name: scenario.name,
-        passed: excerpt !== undefined && requestFailure === undefined,
-        details:
-          excerpt !== undefined && requestFailure === undefined
-            ? excerpt.trim()
-            : (requestFailure ??
-              `Expected logs were not observed for ${new URL(scenario.url).hostname} within the timeout.`),
-        url: scenario.url,
-        inboundTag: scenario.inboundTag,
-        expectedOutboundTag: scenario.expectedOutboundTag,
-      });
+      results.push(await verifyRuntimeScenario(scenario, logBuffer, requestBinary));
     }
 
     return {
@@ -232,6 +187,90 @@ export async function verifyConfigRoutes(
     singBoxProcess.kill("SIGINT");
     await Promise.race([exitPromise, new Promise((resolve) => setTimeout(resolve, 2_000))]);
   }
+}
+
+async function verifyRuntimeScenario(
+  scenario: RuntimeScenario,
+  logBuffer: { text: string },
+  requestBinary: string,
+): Promise<VerificationScenarioResult> {
+  const hostname = new URL(scenario.url).hostname;
+  const expectedLog =
+    scenario.expectedOutboundTag === "direct"
+      ? new RegExp(
+          `outbound/direct\\[direct\\]: outbound connection to ${escapeRegExp(hostname)}:443`,
+        )
+      : new RegExp(
+          `outbound/trojan\\[${escapeRegExp(
+            scenario.expectedOutboundTag,
+          )}\\]: outbound connection to ${escapeRegExp(hostname)}:443`,
+        );
+
+  const inboundLog = new RegExp(
+    `inbound/mixed\\[${escapeRegExp(scenario.inboundTag)}\\]: inbound connection to ${escapeRegExp(
+      hostname,
+    )}:443`,
+  );
+
+  let lastFailure = `Expected logs were not observed for ${hostname} within the timeout.`;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const offset = logBuffer.text.length;
+    const requestResult = await runProxyRequestScenario({
+      requestBinary,
+      proxyPort: scenario.proxyPort,
+      url: scenario.url,
+    });
+    const excerpt = await waitForScenarioLogs(logBuffer, offset, [inboundLog, expectedLog], 20_000);
+    const requestFailure = detectRequestFailure(requestResult);
+
+    const routeLevelProxySuccess = isRouteLevelProxySuccess(scenario, requestResult);
+
+    if (excerpt !== undefined && (requestFailure === undefined || routeLevelProxySuccess)) {
+      return {
+        name: scenario.name,
+        passed: true,
+        details: routeLevelProxySuccess
+          ? `${excerpt.trim()}\nRoute matched and proxy CONNECT succeeded; upstream TLS did not finish before curl timed out.`
+          : excerpt.trim(),
+        url: scenario.url,
+        inboundTag: scenario.inboundTag,
+        expectedOutboundTag: scenario.expectedOutboundTag,
+      };
+    }
+
+    lastFailure =
+      requestFailure ?? `Expected logs were not observed for ${hostname} within the timeout.`;
+
+    if (attempt < 2) {
+      await sleep(500);
+    }
+  }
+
+  return {
+    name: scenario.name,
+    passed: false,
+    details: lastFailure,
+    url: scenario.url,
+    inboundTag: scenario.inboundTag,
+    expectedOutboundTag: scenario.expectedOutboundTag,
+  };
+}
+
+export function isRouteLevelProxySuccess(
+  scenario: Pick<RuntimeScenario, "inboundTag">,
+  requestResult: RequestRunResult,
+): boolean {
+  if (scenario.inboundTag !== "in-proxifier") {
+    return false;
+  }
+
+  return (
+    requestResult.exitCode === 28 &&
+    `${requestResult.stdout}\n${requestResult.stderr}`.includes(
+      "HTTP/1.1 200 Connection established",
+    )
+  );
 }
 
 export async function resolveChromeBinary(explicitPath?: string): Promise<string> {

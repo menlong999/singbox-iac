@@ -2,6 +2,7 @@ import type { BuilderConfig } from "../../config/schema.js";
 import type { BuiltConfigArtifact } from "../build/index.js";
 import { buildConfigArtifact } from "../build/index.js";
 import { applyConfig } from "../manager/index.js";
+import { shouldAutoReloadRuntime } from "../manager/index.js";
 import {
   type VerificationReport,
   assertVerificationReportPassed,
@@ -26,6 +27,7 @@ export interface UpdateResult {
   readonly verification?: VerificationReport;
   readonly livePath: string;
   readonly backupPath?: string;
+  readonly reloaded: boolean;
 }
 
 export async function runUpdate(input: RunUpdateInput): Promise<UpdateResult> {
@@ -49,13 +51,14 @@ export async function runUpdate(input: RunUpdateInput): Promise<UpdateResult> {
 
   const livePath = input.livePath ?? input.config.output.livePath;
   const backupPath = input.backupPath ?? input.config.output.backupPath;
+  const reloaded = input.reload ?? (await shouldAutoReloadRuntime(input.config.runtime.reload));
 
   await applyConfig({
     stagingPath: build.outputPath,
     livePath,
     ...(backupPath ? { backupPath } : {}),
     ...(input.singBoxBinary ? { singBoxBinary: input.singBoxBinary } : {}),
-    reload: input.reload ?? false,
+    reload: reloaded,
     runtime: input.config.runtime.reload,
   });
 
@@ -64,5 +67,6 @@ export async function runUpdate(input: RunUpdateInput): Promise<UpdateResult> {
     ...(verification ? { verification } : {}),
     livePath,
     ...(backupPath ? { backupPath } : {}),
+    reloaded,
   };
 }

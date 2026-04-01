@@ -68,7 +68,7 @@ describe("natural language authoring", () => {
 
     expect(plan.groupDefaults?.devCommonOut?.defaultTarget).toBe("HK");
     expect(plan.groupDefaults?.processProxy?.defaultTarget).toBe("US");
-    expect(plan.groupDefaults?.processProxy?.defaultNodePattern).toBeUndefined();
+    expect(plan.groupDefaults?.processProxy?.defaultNodePattern).toBe("OnlyAI");
     expect(
       plan.beforeBuiltins.some((rule) => rule.domainSuffix?.includes("gemini.google.com")),
     ).toBe(true);

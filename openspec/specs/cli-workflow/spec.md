@@ -6,6 +6,9 @@ Provide a user-friendly command-line interface for initialization, build, apply,
 
 ## Planned Commands
 
+- `go`
+- `use`
+- `update`
 - `init`
 - `setup`
 - `quickstart`
@@ -24,6 +27,10 @@ Provide a user-friendly command-line interface for initialization, build, apply,
 
 ## Requirements
 
+- `go` must provide the shortest first-run onboarding path by accepting a subscription URL and one routing sentence as positional arguments.
+- `use` must provide the shortest everyday rule-change path by accepting one routing sentence and applying it without forcing the user to understand DSL syntax.
+- `update` should auto-reload a running `sing-box` process when the configured reload target is already active.
+- The CLI help output should make it clear that most users only need `go`, `use`, and `update`, while the remaining commands are advanced controls.
 - `init` must generate example configuration assets for the user.
 - `setup` must provide a one-step first-run path that can initialize the default config, prepare rule sets, and build a staging config.
 - `setup` should surface local environment readiness during onboarding unless the user explicitly skips it.

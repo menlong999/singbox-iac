@@ -10,6 +10,7 @@ import { registerAuthorCommand } from "./commands/author.js";
 import { registerBuildCommand } from "./commands/build.js";
 import { registerCheckCommand } from "./commands/check.js";
 import { registerDoctorCommand } from "./commands/doctor.js";
+import { registerGoCommand } from "./commands/go.js";
 import { registerInitCommand } from "./commands/init.js";
 import { registerProxifierCommand } from "./commands/proxifier.js";
 import { registerQuickstartCommand } from "./commands/quickstart.js";
@@ -19,6 +20,7 @@ import { registerScheduleCommand } from "./commands/schedule.js";
 import { registerSetupCommand } from "./commands/setup.js";
 import { registerTemplatesCommand } from "./commands/templates.js";
 import { registerUpdateCommand } from "./commands/update.js";
+import { registerUseCommand } from "./commands/use.js";
 import { registerVerifyCommand } from "./commands/verify.js";
 
 export function createProgram(): Command {
@@ -27,8 +29,23 @@ export function createProgram(): Command {
   program
     .name("singbox-iac")
     .description("Policy-first subscription compiler for sing-box on macOS.")
-    .version("0.1.4");
+    .version("0.1.6")
+    .addHelpText(
+      "after",
+      [
+        "",
+        "Most users only need:",
+        "  singbox-iac go <subscription-url> <一句话需求>",
+        "  singbox-iac use <一句话需求>",
+        "  singbox-iac update",
+        "",
+        "Advanced commands: quickstart, setup, author, build, verify, proxifier, schedule",
+      ].join("\n"),
+    );
 
+  registerGoCommand(program);
+  registerUseCommand(program);
+  registerUpdateCommand(program);
   registerInitCommand(program);
   registerSetupCommand(program);
   registerQuickstartCommand(program);
@@ -38,14 +55,38 @@ export function createProgram(): Command {
   registerApplyCommand(program);
   registerRunCommand(program);
   registerVerifyCommand(program);
-  registerUpdateCommand(program);
   registerDoctorCommand(program);
   registerProxifierCommand(program);
   registerReloadCommand(program);
   registerScheduleCommand(program);
   registerTemplatesCommand(program);
+  hideAdvancedCommands(program);
 
   return program;
+}
+
+function hideAdvancedCommands(program: Command): void {
+  for (const commandName of [
+    "init",
+    "setup",
+    "quickstart",
+    "author",
+    "build",
+    "check",
+    "apply",
+    "run",
+    "verify",
+    "doctor",
+    "proxifier",
+    "reload",
+    "schedule",
+    "templates",
+  ]) {
+    const command = program.commands.find((entry) => entry.name() === commandName);
+    if (command) {
+      (command as Command & { _hidden?: boolean })._hidden = true;
+    }
+  }
 }
 
 export async function run(argv: string[]): Promise<void> {

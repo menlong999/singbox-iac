@@ -4,9 +4,9 @@ import { runUpdate } from "../../modules/update/index.js";
 import { resolveBuilderConfig } from "../command-helpers.js";
 
 export function registerUpdateCommand(program: Command): void {
-  program
+  const command = program
     .command("update")
-    .description("Run build, verify, publish, and optional reload as one closed loop.")
+    .description("Refresh subscription, verify, publish, and auto-reload if sing-box is running.")
     .option("-c, --config <path>", "path to builder config YAML")
     .option("--subscription-url <url>", "override subscription URL when rebuilding")
     .option("--subscription-file <path>", "use a local subscription file instead of fetching")
@@ -51,6 +51,7 @@ export function registerUpdateCommand(program: Command): void {
           verificationSummary,
           `Live: ${result.livePath}`,
           result.backupPath ? `Backup: ${result.backupPath}` : undefined,
+          `Reload: ${result.reloaded ? "triggered" : "skipped"}`,
           `Warnings: ${result.build.warnings.length}`,
         ]
           .filter((line): line is string => typeof line === "string")
@@ -63,6 +64,20 @@ export function registerUpdateCommand(program: Command): void {
         );
       }
     });
+
+  for (const optionName of [
+    "subscriptionUrl",
+    "subscriptionFile",
+    "output",
+    "livePath",
+    "backupPath",
+    "singBoxBin",
+    "chromeBin",
+    "skipVerify",
+    "reload",
+  ]) {
+    command.options.find((entry) => entry.attributeName() === optionName)?.hideHelp();
+  }
 }
 
 interface UpdateCommandOptions {

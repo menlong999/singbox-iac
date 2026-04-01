@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { isDirectCliInvocation } from "../../src/cli/index.js";
+import { createProgram, isDirectCliInvocation } from "../../src/cli/index.js";
 
 describe("cli entrypoint detection", () => {
   const tempDirs: string[] = [];
@@ -43,5 +43,19 @@ describe("cli entrypoint detection", () => {
     writeFileSync(otherPath, "console.log('noop');\n");
 
     expect(isDirectCliInvocation(pathToFileURL(entryPath).href, otherPath)).toBe(false);
+  });
+});
+
+describe("cli help", () => {
+  it("surfaces the streamlined everyday commands and hides advanced commands from the default help", () => {
+    const help = createProgram().helpInformation();
+
+    expect(help).toContain("go");
+    expect(help).toContain("use");
+    expect(help).toContain("update");
+    expect(help).not.toContain("quickstart");
+    expect(help).not.toContain("setup");
+    expect(help).not.toContain("author");
+    expect(help).not.toContain("build [options]");
   });
 });

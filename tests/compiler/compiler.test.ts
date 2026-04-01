@@ -335,6 +335,101 @@ describe("compileConfig", () => {
       outbound: "Stitch-Out",
     });
   });
+
+  it("prefers defaultNodePattern over a coarse defaultTarget when both are configured", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "singbox-iac-pattern-priority-"));
+    tempDirs.push(dir);
+
+    const config: BuilderConfig = {
+      version: 1,
+      subscription: {
+        url: "https://example.com/subscription",
+        format: "base64-lines",
+        protocols: ["trojan"],
+      },
+      output: {
+        stagingPath: "/tmp/staging.json",
+        livePath: "/tmp/live.json",
+        backupPath: "/tmp/backup.json",
+      },
+      runtime: {
+        checkCommand: "sing-box check -c {{stagingPath}}",
+        reload: {
+          kind: "signal",
+          processName: "sing-box",
+          signal: "HUP",
+        },
+      },
+      listeners: {
+        mixed: { enabled: true, listen: "127.0.0.1", port: 39097 },
+        proxifier: { enabled: true, listen: "127.0.0.1", port: 39091 },
+      },
+      ruleSets: makeRuleSets(dir),
+      groups: {
+        processProxy: {
+          type: "selector",
+          includes: ["US", "SG"],
+          defaultTarget: "US",
+          defaultNodePattern: "OnlyAI",
+        },
+        aiOut: { type: "selector", includes: ["HK", "US"], defaultTarget: "HK" },
+        devCommonOut: { type: "selector", includes: ["HK", "US"], defaultTarget: "HK" },
+        stitchOut: { type: "selector", includes: ["US"], defaultTarget: "US" },
+        global: { type: "urltest", includes: ["HK", "US"] },
+      },
+      rules: {
+        userRulesFile: "/tmp/custom.rules.yaml",
+      },
+      verification: {
+        scenarios: [],
+      },
+      schedule: {
+        enabled: false,
+        intervalMinutes: 30,
+      },
+    };
+
+    const artifact = compileConfig({
+      config,
+      nodes: [
+        {
+          protocol: "trojan",
+          tag: "🇺🇸 美国 01",
+          server: "us.example.com",
+          serverPort: 8443,
+          password: "pass-1",
+          sni: "us.example.com",
+          regionHint: "US",
+        },
+        {
+          protocol: "trojan",
+          tag: "🇺🇸 美国 07 - OnlyAI",
+          server: "us-onlyai.example.com",
+          serverPort: 9443,
+          password: "pass-2",
+          sni: "us-onlyai.example.com",
+          regionHint: "US",
+        },
+        {
+          protocol: "trojan",
+          tag: "🇸🇬 新加坡 01",
+          server: "sg.example.com",
+          serverPort: 10443,
+          password: "pass-3",
+          sni: "sg.example.com",
+          regionHint: "SG",
+        },
+      ],
+    });
+
+    expect(
+      (artifact.config.outbounds as Array<Record<string, unknown>>).find(
+        (outbound) => outbound.tag === "Process-Proxy",
+      ),
+    ).toMatchObject({
+      default: "🇺🇸 美国 07 - OnlyAI",
+    });
+  });
 });
 
 function makeRuleSets(dir: string): BuilderConfig["ruleSets"] {
