@@ -7,6 +7,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import type { BuilderConfig } from "../../config/schema.js";
+import type { DNSPlan } from "../../domain/dns-plan.js";
+import type { VerificationPlan } from "../../domain/verification-plan.js";
 import { checkConfig, resolveSingBoxBinary } from "../manager/index.js";
 
 type JsonObject = Record<string, unknown>;
@@ -57,6 +59,41 @@ export interface VisibleChromeLaunch {
   readonly userDataDir: string;
 }
 
+export interface DnsVerificationResult {
+  readonly domain: string;
+  readonly passed: boolean;
+  readonly expectedMode: "fake-ip" | "real-ip";
+  readonly actualMode: "fake-ip" | "real-ip";
+  readonly resolver: string;
+}
+
+export interface AppVerificationResult {
+  readonly app: string;
+  readonly passed: boolean;
+  readonly expectedInbound: "in-proxifier" | "in-default";
+  readonly expectedOutboundGroup: string;
+  readonly details: string;
+}
+
+export interface ProtocolVerificationResult {
+  readonly target: string;
+  readonly passed: boolean;
+  readonly expectTCPOnly: boolean;
+  readonly details: string;
+}
+
+export interface EgressVerificationResult {
+  readonly id: string;
+  readonly target: string;
+  readonly inbound: "in-mixed" | "in-proxifier";
+  readonly expectedOutboundGroup: string;
+  readonly passed: boolean;
+  readonly ip?: string;
+  readonly country?: string;
+  readonly asn?: string;
+  readonly details: string;
+}
+
 export function assertVerificationReportPassed(report: VerificationReport): void {
   const failures = report.scenarios.filter((scenario) => !scenario.passed);
   if (failures.length === 0) {
@@ -100,6 +137,10 @@ interface RequestRunResult {
   readonly stdout: string;
   readonly stderr: string;
   readonly timedOut: boolean;
+}
+
+interface JsonRequestResult extends RequestRunResult {
+  readonly body: string;
 }
 
 export async function verifyConfigRoutes(
@@ -187,6 +228,206 @@ export async function verifyConfigRoutes(
     singBoxProcess.kill("SIGINT");
     await Promise.race([exitPromise, new Promise((resolve) => setTimeout(resolve, 2_000))]);
   }
+}
+
+export function verifyDnsPlan(
+  plan: VerificationPlan,
+  dnsPlan: DNSPlan,
+): readonly DnsVerificationResult[] {
+  return plan.dnsChecks.map((check) => ({
+    domain: check.domain,
+    passed: dnsPlan.mode === check.expectedMode,
+    expectedMode: check.expectedMode,
+    actualMode: dnsPlan.mode,
+    resolver: check.expectedResolver ?? dnsPlan.defaultResolvers[0] ?? "unknown",
+  }));
+}
+
+export function verifyAppPlan(
+  plan: VerificationPlan,
+  config: JsonObject,
+): readonly AppVerificationResult[] {
+  const route = asObject(config.route, "Config is missing route.");
+  const rules = ensureArray<JsonObject>(route.rules, "Route is missing rules.");
+  const proxifierProtected = rules.some(
+    (rule) =>
+      Array.isArray(rule.inbound) &&
+      rule.inbound.includes("in-proxifier") &&
+      rule.action === "route" &&
+      rule.outbound === "Process-Proxy",
+  );
+
+  return plan.appChecks.map((check) => ({
+    app: check.app,
+    passed: check.expectedInbound === "in-proxifier" ? proxifierProtected : true,
+    expectedInbound: check.expectedInbound,
+    expectedOutboundGroup: check.expectedOutboundGroup,
+    details:
+      check.expectedInbound === "in-proxifier"
+        ? "Protected in-proxifier route is present."
+        : "No special app inbound is required.",
+  }));
+}
+
+export function verifyProtocolPlan(
+  plan: VerificationPlan,
+  config: JsonObject,
+): readonly ProtocolVerificationResult[] {
+  const route = asObject(config.route, "Config is missing route.");
+  const rules = ensureArray<JsonObject>(route.rules, "Route is missing rules.");
+  const quicReject = rules.some(
+    (rule) => rule.network === "udp" && rule.port === 443 && rule.action === "reject",
+  );
+
+  return plan.protocolChecks.map((check) => ({
+    target: check.target,
+    passed: check.expectTCPOnly ? quicReject : true,
+    expectTCPOnly: check.expectTCPOnly === true,
+    details:
+      check.expectTCPOnly === true
+        ? quicReject
+          ? "UDP 443 reject is present, so TCP-only fallback is enforced."
+          : "UDP 443 reject is missing."
+        : "No protocol restriction requested.",
+  }));
+}
+
+export async function verifyEgressPlan(input: {
+  readonly configPath: string;
+  readonly checks: VerificationPlan["egressChecks"];
+  readonly singBoxBinary?: string;
+  readonly requestBinary?: string;
+}): Promise<readonly EgressVerificationResult[]> {
+  if (input.checks.length === 0) {
+    return [];
+  }
+
+  const singBoxBinary = await resolveSingBoxBinary(input.singBoxBinary);
+  const requestBinary = input.requestBinary ?? (await resolveCurlBinary());
+  const baseConfig = JSON.parse(await readFile(input.configPath, "utf8")) as JsonObject;
+  const egressGeoServiceUrls = [
+    "https://api.ip.sb/geoip",
+    "https://ipinfo.io/json",
+    "https://ifconfig.co/json",
+  ];
+  const egressIpServiceUrls = [
+    "https://api.ipify.org?format=json",
+    "https://api64.ipify.org?format=json",
+    "https://ifconfig.me/all.json",
+    "https://icanhazip.com/",
+  ];
+  const results: EgressVerificationResult[] = [];
+
+  for (const check of input.checks) {
+    const prepared = await prepareVerificationConfig(baseConfig);
+    const route = asObject(prepared.config.route, "Config is missing route.");
+    const rules = ensureArray<JsonObject>(route.rules, "Route is missing rules.");
+    rules.unshift({
+      domain_suffix: [...egressGeoServiceUrls, ...egressIpServiceUrls].map(
+        (url) => new URL(url).hostname,
+      ),
+      action: "route",
+      outbound: check.expectedOutboundGroup,
+    });
+
+    const runDir = await mkdtemp(path.join(tmpdir(), "singbox-iac-egress-"));
+    const verifyConfigPath = path.join(runDir, "egress.config.json");
+    const logPath = path.join(runDir, "egress.log");
+    await writeFile(verifyConfigPath, `${JSON.stringify(prepared.config, null, 2)}\n`, "utf8");
+    await checkConfig({ configPath: verifyConfigPath, singBoxBinary });
+
+    const logBuffer = { text: "" };
+    const appender = async (chunk: Buffer | string): Promise<void> => {
+      const text = chunk.toString();
+      logBuffer.text += text;
+      await writeFile(logPath, text, { encoding: "utf8", flag: "a" });
+    };
+
+    const child = spawn(singBoxBinary, ["run", "-c", verifyConfigPath], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    child.stdout.on("data", (chunk) => void appender(chunk));
+    child.stderr.on("data", (chunk) => void appender(chunk));
+    const exitPromise = new Promise<number>((resolve, reject) => {
+      child.on("error", reject);
+      child.on("close", (code) => resolve(code ?? 0));
+    });
+
+    try {
+      await waitForLog(
+        logBuffer,
+        /sing-box started/,
+        15_000,
+        "Timed out waiting for sing-box startup during egress verification.",
+      );
+      const proxyPort =
+        check.inbound === "in-proxifier" ? prepared.proxifierPort : prepared.mixedPort;
+      let payload = await probeEgressPayload({
+        requestBinary,
+        proxyPort,
+        targets: [check.target, ...egressGeoServiceUrls.filter((url) => url !== check.target)],
+      });
+      let ip = extractIpAddress(payload);
+      let country = normalizeCountryCode(payload);
+      let asn = normalizeAsn(payload);
+
+      if (!ip || !country || !asn) {
+        const ipPayload = await probeEgressPayload({
+          requestBinary,
+          proxyPort,
+          targets: egressIpServiceUrls,
+        });
+        payload = { ...payload, ...ipPayload };
+        ip = extractIpAddress(payload);
+        country = normalizeCountryCode(payload);
+        asn = normalizeAsn(payload);
+      }
+
+      if (ip && (!country || !asn)) {
+        const geoPayload = await probeEgressPayload({
+          requestBinary,
+          targets: [`https://api.ip.sb/geoip/${ip}`, `https://ipinfo.io/${ip}/json`],
+        });
+        payload = { ...payload, ...geoPayload, ip };
+        country = normalizeCountryCode(payload);
+        asn = normalizeAsn(payload);
+      }
+
+      const expectedCountrySatisfied =
+        !check.expectedCountry || check.expectedCountry.length === 0
+          ? true
+          : country !== undefined && check.expectedCountry.includes(country);
+      const expectedAsnSatisfied =
+        !check.expectedASN || check.expectedASN.length === 0
+          ? true
+          : asn !== undefined && check.expectedASN.some((expected) => asn.includes(expected));
+      results.push({
+        id: check.id,
+        target: check.target,
+        inbound: check.inbound,
+        expectedOutboundGroup: check.expectedOutboundGroup,
+        passed: expectedCountrySatisfied && expectedAsnSatisfied,
+        ...(ip ? { ip } : {}),
+        ...(country ? { country } : {}),
+        ...(asn ? { asn } : {}),
+        details: `Exit via ${check.expectedOutboundGroup} returned ${JSON.stringify(payload)}`,
+      });
+    } catch (error) {
+      results.push({
+        id: check.id,
+        target: check.target,
+        inbound: check.inbound,
+        expectedOutboundGroup: check.expectedOutboundGroup,
+        passed: false,
+        details: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      child.kill("SIGINT");
+      await Promise.race([exitPromise, new Promise((resolve) => setTimeout(resolve, 2_000))]);
+    }
+  }
+
+  return results;
 }
 
 async function verifyRuntimeScenario(
@@ -699,6 +940,69 @@ async function runProxyRequestScenario(input: {
   });
 }
 
+async function runProxyJsonRequestScenario(input: {
+  readonly requestBinary: string;
+  readonly proxyPort: number;
+  readonly url: string;
+}): Promise<JsonRequestResult> {
+  return runJsonRequestScenario(input);
+}
+
+async function runJsonRequestScenario(input: {
+  readonly requestBinary: string;
+  readonly url: string;
+  readonly proxyPort?: number;
+}): Promise<JsonRequestResult> {
+  const args = [
+    "--silent",
+    "--show-error",
+    "--location",
+    "--max-time",
+    "12",
+    "--connect-timeout",
+    "5",
+    input.url,
+  ];
+  if (typeof input.proxyPort === "number") {
+    args.splice(args.length - 1, 0, "--proxy", `http://127.0.0.1:${input.proxyPort}`);
+  }
+
+  return new Promise<JsonRequestResult>((resolve, reject) => {
+    const child = spawn(input.requestBinary, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, 12_000);
+
+    child.stdout.on("data", (chunk: Buffer | string) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk: Buffer | string) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      resolve({
+        exitCode: code ?? 0,
+        stdout,
+        stderr,
+        timedOut,
+        body: stdout,
+      });
+    });
+  });
+}
+
 function detectRequestFailure(result: RequestRunResult): string | undefined {
   if (result.exitCode !== 0 && !result.timedOut) {
     return `Proxy request exited with code ${result.exitCode}.\n${`${result.stdout}\n${result.stderr}`.trim()}`;
@@ -708,6 +1012,88 @@ function detectRequestFailure(result: RequestRunResult): string | undefined {
     return "Proxy request timed out.";
   }
 
+  return undefined;
+}
+
+function parseEgressPayload(body: string): Record<string, unknown> {
+  const trimmed = body.trim();
+  if (trimmed.length === 0) {
+    throw new Error("Egress probe returned an empty body.");
+  }
+
+  if (isIpAddress(trimmed)) {
+    return { ip: trimmed };
+  }
+
+  try {
+    return JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    throw new Error(`Unable to parse egress response JSON:\n${trimmed}`);
+  }
+}
+
+async function probeEgressPayload(input: {
+  readonly requestBinary: string;
+  readonly proxyPort?: number;
+  readonly targets: readonly string[];
+}): Promise<Record<string, unknown>> {
+  const errors: string[] = [];
+
+  for (const target of input.targets) {
+    const result = await runJsonRequestScenario({
+      requestBinary: input.requestBinary,
+      url: target,
+      ...(typeof input.proxyPort === "number" ? { proxyPort: input.proxyPort } : {}),
+    });
+    if (result.exitCode !== 0 || result.timedOut) {
+      errors.push(`${target}: ${detectRequestFailure(result) ?? "request failed"}`);
+      continue;
+    }
+
+    try {
+      return parseEgressPayload(result.body);
+    } catch (error) {
+      errors.push(`${target}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  throw new Error(`All egress probes failed.\n${errors.join("\n")}`);
+}
+
+function extractIpAddress(payload: Record<string, unknown>): string | undefined {
+  const candidates = [payload.ip, payload.query, payload.address];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && isIpAddress(candidate.trim())) {
+      return candidate.trim();
+    }
+  }
+  return undefined;
+}
+
+function normalizeCountryCode(payload: Record<string, unknown>): string | undefined {
+  if (typeof payload.country_code === "string") {
+    return payload.country_code.toUpperCase();
+  }
+  if (typeof payload.country === "string" && payload.country.length <= 3) {
+    return payload.country.toUpperCase();
+  }
+  return undefined;
+}
+
+function isIpAddress(value: string): boolean {
+  return /^[\dA-Fa-f:.]+$/.test(value);
+}
+
+function normalizeAsn(payload: Record<string, unknown>): string | undefined {
+  if (typeof payload.asn === "number") {
+    return `AS${payload.asn}`;
+  }
+  if (typeof payload.asn === "string") {
+    return payload.asn.startsWith("AS") ? payload.asn : `AS${payload.asn}`;
+  }
+  if (typeof payload.org === "string" && payload.org.length > 0) {
+    return payload.org;
+  }
   return undefined;
 }
 

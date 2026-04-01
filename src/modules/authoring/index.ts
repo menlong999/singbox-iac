@@ -7,6 +7,8 @@ import path from "node:path";
 import { z } from "zod";
 
 import type { BuilderConfig } from "../../config/schema.js";
+import type { IntentIR } from "../../domain/intent.js";
+import { intentFromNaturalLanguagePlan } from "../intent/index.js";
 import {
   type NaturalLanguagePlan,
   type NaturalLanguageVerificationOverride,
@@ -91,6 +93,7 @@ export interface GenerateAuthoringPlanInput {
 
 export interface GenerateAuthoringPlanResult {
   readonly plan: NaturalLanguagePlan;
+  readonly intent: IntentIR;
   readonly providerRequested: AuthoringProvider;
   readonly providerUsed: Exclude<AuthoringProvider, "auto">;
 }
@@ -150,35 +153,41 @@ export async function generateAuthoringPlan(
   const runner = input.runner ?? runAuthoringCommand;
 
   if (providerRequested === "deterministic") {
+    const plan = generateRulesFromPrompt(input.prompt);
     return {
       providerRequested,
       providerUsed: "deterministic",
-      plan: generateRulesFromPrompt(input.prompt),
+      plan,
+      intent: intentFromNaturalLanguagePlan(plan),
     };
   }
 
   if (providerRequested === "claude") {
+    const plan = await generateWithClaude(input.prompt, input.config, timeoutMs, runner);
     return {
       providerRequested,
       providerUsed: "claude",
-      plan: await generateWithClaude(input.prompt, input.config, timeoutMs, runner),
+      plan,
+      intent: intentFromNaturalLanguagePlan(plan),
     };
   }
 
   if (providerRequested === "exec") {
+    const plan = await generateWithExec(
+      input.prompt,
+      input.config,
+      {
+        command: input.execCommand ?? input.config?.authoring.exec?.command,
+        args: input.execArgs ?? input.config?.authoring.exec?.args,
+      },
+      timeoutMs,
+      runner,
+    );
     return {
       providerRequested,
       providerUsed: "exec",
-      plan: await generateWithExec(
-        input.prompt,
-        input.config,
-        {
-          command: input.execCommand ?? input.config?.authoring.exec?.command,
-          args: input.execArgs ?? input.config?.authoring.exec?.args,
-        },
-        timeoutMs,
-        runner,
-      ),
+      plan,
+      intent: intentFromNaturalLanguagePlan(plan),
     };
   }
 
@@ -250,19 +259,21 @@ async function generateWithAuto(
 ): Promise<GenerateAuthoringPlanResult> {
   if (execCommand || config?.authoring.exec?.command) {
     try {
+      const plan = await generateWithExec(
+        prompt,
+        config,
+        {
+          command: execCommand ?? config?.authoring.exec?.command,
+          args: execArgs ?? config?.authoring.exec?.args,
+        },
+        timeoutMs,
+        runner,
+      );
       return {
         providerRequested: "auto",
         providerUsed: "exec",
-        plan: await generateWithExec(
-          prompt,
-          config,
-          {
-            command: execCommand ?? config?.authoring.exec?.command,
-            args: execArgs ?? config?.authoring.exec?.args,
-          },
-          timeoutMs,
-          runner,
-        ),
+        plan,
+        intent: intentFromNaturalLanguagePlan(plan),
       };
     } catch (error) {
       return fallbackDeterministic(
@@ -276,10 +287,12 @@ async function generateWithAuto(
   const claudePath = await resolveExecutable("claude");
   if (claudePath) {
     try {
+      const plan = await generateWithClaude(prompt, config, timeoutMs, runner, claudePath);
       return {
         providerRequested: "auto",
         providerUsed: "claude",
-        plan: await generateWithClaude(prompt, config, timeoutMs, runner, claudePath),
+        plan,
+        intent: intentFromNaturalLanguagePlan(plan),
       };
     } catch (error) {
       return fallbackDeterministic(
@@ -290,12 +303,15 @@ async function generateWithAuto(
     }
   }
 
+  const plan = appendNotes(generateRulesFromPrompt(prompt), [
+    "Auto authoring fell back to the built-in deterministic parser because no supported local AI CLI was available.",
+  ]);
+
   return {
     providerRequested: "auto",
     providerUsed: "deterministic",
-    plan: appendNotes(generateRulesFromPrompt(prompt), [
-      "Auto authoring fell back to the built-in deterministic parser because no supported local AI CLI was available.",
-    ]),
+    plan,
+    intent: intentFromNaturalLanguagePlan(plan),
   };
 }
 
@@ -583,12 +599,15 @@ function fallbackDeterministic(
   providerUsed: Exclude<AuthoringProvider, "auto" | "deterministic">,
   reason: string,
 ): GenerateAuthoringPlanResult {
+  const plan = appendNotes(generateRulesFromPrompt(prompt), [
+    `Auto authoring fell back from ${providerUsed} to the deterministic parser: ${reason}`,
+  ]);
+
   return {
     providerRequested: "auto",
     providerUsed: "deterministic",
-    plan: appendNotes(generateRulesFromPrompt(prompt), [
-      `Auto authoring fell back from ${providerUsed} to the deterministic parser: ${reason}`,
-    ]),
+    plan,
+    intent: intentFromNaturalLanguagePlan(plan),
   };
 }
 

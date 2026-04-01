@@ -11,10 +11,12 @@ import { registerBuildCommand } from "./commands/build.js";
 import { registerCheckCommand } from "./commands/check.js";
 import { registerDoctorCommand } from "./commands/doctor.js";
 import { registerGoCommand } from "./commands/go.js";
+import { registerHistoryCommand } from "./commands/history.js";
 import { registerInitCommand } from "./commands/init.js";
 import { registerProxifierCommand } from "./commands/proxifier.js";
 import { registerQuickstartCommand } from "./commands/quickstart.js";
 import { registerReloadCommand } from "./commands/reload.js";
+import { registerRollbackCommand } from "./commands/rollback.js";
 import { registerRunCommand } from "./commands/run.js";
 import { registerScheduleCommand } from "./commands/schedule.js";
 import { registerSetupCommand } from "./commands/setup.js";
@@ -53,7 +55,9 @@ export function createProgram(): Command {
   registerBuildCommand(program);
   registerCheckCommand(program);
   registerApplyCommand(program);
+  registerHistoryCommand(program);
   registerRunCommand(program);
+  registerRollbackCommand(program);
   registerVerifyCommand(program);
   registerDoctorCommand(program);
   registerProxifierCommand(program);
@@ -74,7 +78,9 @@ function hideAdvancedCommands(program: Command): void {
     "build",
     "check",
     "apply",
+    "history",
     "run",
+    "rollback",
     "verify",
     "doctor",
     "proxifier",

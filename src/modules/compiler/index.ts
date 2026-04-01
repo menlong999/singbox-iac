@@ -2,14 +2,15 @@ import { existsSync } from "node:fs";
 
 import type { BuilderConfig } from "../../config/schema.js";
 import type { BuildArtifact } from "../../domain/config.js";
+import type { IntentIR, IntentSitePolicy } from "../../domain/intent.js";
 import type { NormalizedNode } from "../../domain/node.js";
 import type { TrojanOutbound } from "../../domain/outbound.js";
-import type { LoadedUserRules, UserRouteRule } from "../user-rules/index.js";
+import { buildDnsPlan, compileDnsPlan, getDefaultDnsServerTag } from "../dns-plan/index.js";
 
 export interface CompileConfigInput {
   readonly nodes: NormalizedNode[];
   readonly config: BuilderConfig;
-  readonly userRules?: LoadedUserRules;
+  readonly intent: IntentIR;
 }
 
 const urlTestDefaults = {
@@ -39,8 +40,6 @@ const devCommonRuleSetTags = new Set([
   "geosite-cursor",
   "geosite-figma",
 ]);
-
-const defaultDnsServerTag = "dns-local-default";
 
 export function compileConfig(input: CompileConfigInput): BuildArtifact {
   if (input.nodes.length === 0) {
@@ -134,8 +133,9 @@ export function compileConfig(input: CompileConfigInput): BuildArtifact {
       outbound: "AI-Out",
     },
   ];
-  const beforeBuiltins = compileUserRouteRules(
-    input.userRules?.beforeBuiltins ?? [],
+  const beforeBuiltins = compileIntentSitePolicies(
+    input.intent.sitePolicies,
+    "beforeBuiltins",
     availableOutboundTags,
     activeRuleSetTags,
   );
@@ -162,8 +162,9 @@ export function compileConfig(input: CompileConfigInput): BuildArtifact {
     });
   }
 
-  const afterBuiltins = compileUserRouteRules(
-    input.userRules?.afterBuiltins ?? [],
+  const afterBuiltins = compileIntentSitePolicies(
+    input.intent.sitePolicies,
+    "afterBuiltins",
     availableOutboundTags,
     activeRuleSetTags,
   );
@@ -182,11 +183,17 @@ export function compileConfig(input: CompileConfigInput): BuildArtifact {
     ...tailRules,
   ];
 
+  const dnsPlan = buildDnsPlan({
+    config: input.config,
+    intent: input.intent,
+    activeRuleSetTags: [...activeRuleSetTags],
+  });
+
   const route: ConfigObject = {
     rules,
     final: "Global",
     auto_detect_interface: true,
-    default_domain_resolver: defaultDnsServerTag,
+    default_domain_resolver: getDefaultDnsServerTag(),
   };
 
   if (availableRuleSets.length > 0) {
@@ -195,29 +202,7 @@ export function compileConfig(input: CompileConfigInput): BuildArtifact {
 
   const config: Record<string, unknown> = {
     log: { level: "info" },
-    dns: {
-      servers: [
-        {
-          type: "local",
-          tag: defaultDnsServerTag,
-          prefer_go: true,
-        },
-        {
-          type: "tcp",
-          tag: "dns-remote-primary",
-          server: "1.1.1.1",
-          server_port: 53,
-        },
-        {
-          type: "tcp",
-          tag: "dns-remote-cn",
-          server: "223.5.5.5",
-          server_port: 53,
-        },
-      ],
-      final: defaultDnsServerTag,
-      strategy: "prefer_ipv4",
-    },
+    dns: compileDnsPlan(dnsPlan),
     inbounds: [
       {
         type: "mixed",
@@ -239,68 +224,73 @@ export function compileConfig(input: CompileConfigInput): BuildArtifact {
   return { config, warnings };
 }
 
-function compileUserRouteRules(
-  rules: readonly UserRouteRule[],
+function compileIntentSitePolicies(
+  policies: readonly IntentSitePolicy[],
+  placement: IntentSitePolicy["placement"],
   availableOutboundTags: ReadonlySet<string>,
   activeRuleSetTags: ReadonlySet<string>,
 ): Array<Record<string, unknown>> {
-  return rules.map((rule, index) =>
-    compileUserRouteRule(rule, index, availableOutboundTags, activeRuleSetTags),
-  );
+  return policies
+    .filter((policy) => policy.placement === placement)
+    .map((policy, index) =>
+      compileIntentSitePolicy(policy, index, availableOutboundTags, activeRuleSetTags),
+    );
 }
 
-function compileUserRouteRule(
-  rule: UserRouteRule,
+function compileIntentSitePolicy(
+  policy: IntentSitePolicy,
   index: number,
   availableOutboundTags: ReadonlySet<string>,
   activeRuleSetTags: ReadonlySet<string>,
 ): Record<string, unknown> {
   const compiled: Record<string, unknown> = {};
-  const name = rule.name ?? `user rule #${index + 1}`;
+  const name = policy.name ?? `intent policy #${index + 1}`;
 
-  if (rule.inbound) {
-    compiled.inbound = [...rule.inbound];
+  if (policy.match.inbound) {
+    compiled.inbound = [...policy.match.inbound];
   }
-  if (rule.protocol) {
-    compiled.protocol = rule.protocol;
+  if (policy.match.protocol) {
+    compiled.protocol = policy.match.protocol;
   }
-  if (rule.network) {
-    compiled.network = rule.network;
+  if (policy.match.network) {
+    compiled.network = policy.match.network;
   }
-  if (rule.port) {
-    compiled.port = rule.port;
+  if (policy.match.port) {
+    compiled.port = policy.match.port;
   }
-  if (rule.domain) {
-    compiled.domain = [...rule.domain];
+  if (policy.match.domain) {
+    compiled.domain = [...policy.match.domain];
   }
-  if (rule.domainSuffix) {
-    compiled.domain_suffix = [...rule.domainSuffix];
+  if (policy.match.domainSuffix) {
+    compiled.domain_suffix = [...policy.match.domainSuffix];
   }
-  if (rule.ruleSet) {
-    const missingRuleSets = rule.ruleSet.filter((tag) => !activeRuleSetTags.has(tag));
+  if (policy.match.ruleSet) {
+    const missingRuleSets = policy.match.ruleSet.filter((tag) => !activeRuleSetTags.has(tag));
     if (missingRuleSets.length > 0) {
       throw new Error(
-        `Custom rule "${name}" references missing rule set tags: ${missingRuleSets.join(", ")}.`,
+        `Intent rule "${name}" references missing rule set tags: ${missingRuleSets.join(", ")}.`,
       );
     }
-    compiled.rule_set = [...rule.ruleSet];
+    compiled.rule_set = [...policy.match.ruleSet];
   }
 
-  if (rule.route) {
-    if (!availableOutboundTags.has(rule.route)) {
-      throw new Error(`Custom rule "${name}" references unknown outbound "${rule.route}".`);
+  if (policy.action.type === "route") {
+    if (!availableOutboundTags.has(policy.action.outboundGroup)) {
+      throw new Error(
+        `Intent rule "${name}" references unknown outbound "${policy.action.outboundGroup}".`,
+      );
     }
     compiled.action = "route";
-    compiled.outbound = rule.route;
+    compiled.outbound = policy.action.outboundGroup;
     return compiled;
   }
 
-  if (rule.action === "reject") {
+  if (policy.action.type === "reject") {
     compiled.action = "reject";
     return compiled;
   }
 
-  throw new Error(`Custom rule "${name}" did not resolve to a supported sing-box action.`);
+  throw new Error(`Intent rule "${name}" did not resolve to a supported sing-box action.`);
 }
 
 function toTrojanOutbound(node: NormalizedNode): TrojanOutbound {

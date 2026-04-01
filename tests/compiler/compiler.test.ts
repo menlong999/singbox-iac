@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { BuilderConfig } from "../../src/config/schema.js";
 import { compileConfig } from "../../src/modules/compiler/index.js";
+import { createEmptyIntent, intentFromUserRules } from "../../src/modules/intent/index.js";
 
 describe("compileConfig", () => {
   const tempDirs: string[] = [];
@@ -90,6 +91,7 @@ describe("compileConfig", () => {
 
     const artifact = compileConfig({
       config,
+      intent: createEmptyIntent(),
       nodes: [
         {
           protocol: "trojan",
@@ -286,7 +288,7 @@ describe("compileConfig", () => {
 
     const artifact = compileConfig({
       config,
-      userRules: {
+      intent: intentFromUserRules({
         beforeBuiltins: [
           {
             name: "OpenRouter uses AI path",
@@ -296,7 +298,7 @@ describe("compileConfig", () => {
         ],
         afterBuiltins: [],
         warnings: [],
-      },
+      }),
       nodes: [
         {
           protocol: "trojan",
@@ -391,6 +393,7 @@ describe("compileConfig", () => {
 
     const artifact = compileConfig({
       config,
+      intent: createEmptyIntent(),
       nodes: [
         {
           protocol: "trojan",

@@ -3,6 +3,7 @@ import type { BuiltConfigArtifact } from "../build/index.js";
 import { buildConfigArtifact } from "../build/index.js";
 import { applyConfig } from "../manager/index.js";
 import { shouldAutoReloadRuntime } from "../manager/index.js";
+import { applyWithTransaction } from "../transactions/index.js";
 import {
   type VerificationReport,
   assertVerificationReportPassed,
@@ -28,6 +29,7 @@ export interface UpdateResult {
   readonly livePath: string;
   readonly backupPath?: string;
   readonly reloaded: boolean;
+  readonly transactionId: string;
 }
 
 export async function runUpdate(input: RunUpdateInput): Promise<UpdateResult> {
@@ -53,13 +55,27 @@ export async function runUpdate(input: RunUpdateInput): Promise<UpdateResult> {
   const backupPath = input.backupPath ?? input.config.output.backupPath;
   const reloaded = input.reload ?? (await shouldAutoReloadRuntime(input.config.runtime.reload));
 
-  await applyConfig({
-    stagingPath: build.outputPath,
+  const transaction = await applyWithTransaction({
+    config: input.config,
+    generatedPath: build.outputPath,
     livePath,
-    ...(backupPath ? { backupPath } : {}),
-    ...(input.singBoxBinary ? { singBoxBinary: input.singBoxBinary } : {}),
-    reload: reloaded,
-    runtime: input.config.runtime.reload,
+    backupPath,
+    verificationSummary: verification
+      ? {
+          routeScenariosPassed: verification.scenarios.filter((scenario) => scenario.passed).length,
+          routeScenariosTotal: verification.scenarios.length,
+        }
+      : { routeScenariosSkipped: true },
+    apply: async () => {
+      await applyConfig({
+        stagingPath: build.outputPath,
+        livePath,
+        ...(backupPath ? { backupPath } : {}),
+        ...(input.singBoxBinary ? { singBoxBinary: input.singBoxBinary } : {}),
+        reload: reloaded,
+        runtime: input.config.runtime.reload,
+      });
+    },
   });
 
   return {
@@ -68,5 +84,6 @@ export async function runUpdate(input: RunUpdateInput): Promise<UpdateResult> {
     livePath,
     ...(backupPath ? { backupPath } : {}),
     reloaded,
+    transactionId: transaction.txId,
   };
 }

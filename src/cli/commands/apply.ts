@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 
 import { applyConfig } from "../../modules/manager/index.js";
+import { applyWithTransaction } from "../../modules/transactions/index.js";
 import { resolveBuilderConfig } from "../command-helpers.js";
 
 export function registerApplyCommand(program: Command): void {
@@ -25,19 +26,30 @@ export function registerApplyCommand(program: Command): void {
         );
       }
 
-      await applyConfig({
-        stagingPath,
-        livePath,
-        ...(backupPath ? { backupPath } : {}),
-        ...(options.singBoxBin ? { singBoxBinary: options.singBoxBin } : {}),
-        ...(options.reload !== undefined ? { reload: options.reload } : {}),
-        ...(builderConfig?.runtime.reload ? { runtime: builderConfig.runtime.reload } : {}),
-      });
+      const transaction = builderConfig
+        ? await applyWithTransaction({
+            config: builderConfig,
+            generatedPath: stagingPath,
+            livePath,
+            backupPath: backupPath ?? builderConfig.output.backupPath,
+            verificationSummary: {},
+            apply: async () => {
+              await applyConfig({
+                stagingPath,
+                livePath,
+                ...(backupPath ? { backupPath } : {}),
+                ...(options.singBoxBin ? { singBoxBinary: options.singBoxBin } : {}),
+                ...(options.reload !== undefined ? { reload: options.reload } : {}),
+                ...(builderConfig?.runtime.reload ? { runtime: builderConfig.runtime.reload } : {}),
+              });
+            },
+          })
+        : undefined;
 
       process.stdout.write(
         `Applied config.\nSource: ${stagingPath}\nLive: ${livePath}\n${
           backupPath ? `Backup: ${backupPath}\n` : ""
-        }`,
+        }${transaction ? `Transaction: ${transaction.txId}\n` : ""}`,
       );
     });
 }
