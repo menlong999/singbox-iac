@@ -1,6 +1,6 @@
 {
   "name": "@singbox-iac/cli",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Policy-first subscription compiler for sing-box on macOS.",
   "repository": {
     "type": "git",

@@ -7,6 +7,7 @@ import path from "node:path";
 import type { Command } from "commander";
 
 import { loadConfig } from "../../config/load-config.js";
+import type { IntentIR, IntentSitePolicy } from "../../domain/intent.js";
 import { generateAuthoringPlan } from "../../modules/authoring/index.js";
 import { buildConfigArtifact, resolveEffectiveIntent } from "../../modules/build/index.js";
 import { updateBuilderDesktopRuntime } from "../../modules/desktop-runtime/index.js";
@@ -34,6 +35,7 @@ import {
 import { installLaunchdSchedule } from "../../modules/schedule/index.js";
 import {
   type VerificationReport,
+  type VerificationScenarioResult,
   assertVerificationReportPassed,
   openVisibleChromeWindows,
   verifyConfigRoutes,
@@ -138,6 +140,9 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
         templates: readonly string[];
         generatedRules: number;
         notes: readonly string[];
+        intent: IntentIR;
+        ambiguities: readonly string[];
+        groupDefaults: Record<string, unknown>;
       }
     | undefined;
   let proxifierSummary:
@@ -187,6 +192,9 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
       templates: planResult.plan.templateIds,
       generatedRules: planResult.plan.beforeBuiltins.length + planResult.plan.afterBuiltins.length,
       notes: planResult.plan.notes,
+      intent: planResult.intent,
+      ambiguities: planResult.ambiguities,
+      groupDefaults: planResult.plan.groupDefaults ?? {},
     };
   }
 
@@ -272,15 +280,7 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
   }
 
   if (planSummary) {
-    lines.push(`Provider requested: ${planSummary.providerRequested}`);
-    lines.push(`Provider used: ${planSummary.providerUsed}`);
-    lines.push(
-      `Templates: ${planSummary.templates.length > 0 ? planSummary.templates.join(", ") : "(none)"}`,
-    );
-    lines.push(`Generated rules: ${planSummary.generatedRules}`);
-    if (planSummary.notes.length > 0) {
-      lines.push(...planSummary.notes.map((note) => `- ${note}`));
-    }
+    lines.push(...formatIntentSummary(planSummary));
   }
 
   const selectedProxifierBundles = options.prompt
@@ -397,11 +397,7 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
         configuredScenarios: effectiveConfig.verification.scenarios,
       });
       assertVerificationReportPassed(verification);
-      lines.push(
-        `Verified scenarios: ${
-          verification.scenarios.filter((scenario) => scenario.passed).length
-        }/${verification.scenarios.length}`,
-      );
+      lines.push(...formatVerificationSummary(verification));
     }
 
     if (shouldApply) {
@@ -462,6 +458,9 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
   lines.push(
     `Proxy ports: mixed ${effectiveConfig.listeners.mixed.listen}:${effectiveConfig.listeners.mixed.port}, proxifier ${effectiveConfig.listeners.proxifier.listen}:${effectiveConfig.listeners.proxifier.port}`,
   );
+  if (!shouldRun) {
+    lines.push("Runtime: not started (--no-run).");
+  }
   if (shouldApply) {
     lines.push(
       desktopRuntimeProfile === "none"
@@ -478,7 +477,7 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
     lines.push("Next: singbox-iac update --reload");
   }
 
-  process.stdout.write(`${lines.join("\n")}\n`);
+  process.stdout.write(`${renderCliSummary(lines)}\n`);
 
   if (!shouldRun || !buildSummary) {
     return;
@@ -622,6 +621,193 @@ function formatDoctorSummary(report: Awaited<ReturnType<typeof runDoctor>>): str
   }
 
   return lines;
+}
+
+function formatIntentSummary(planSummary: {
+  providerRequested: string;
+  providerUsed: string;
+  templates: readonly string[];
+  generatedRules: number;
+  notes: readonly string[];
+  intent: IntentIR;
+  ambiguities: readonly string[];
+  groupDefaults: Record<string, unknown>;
+}): string[] {
+  const lines = [
+    `Intent: provider ${planSummary.providerUsed}${planSummary.providerUsed !== planSummary.providerRequested ? ` (requested ${planSummary.providerRequested})` : ""}`,
+  ];
+
+  if (planSummary.templates.length > 0) {
+    lines.push(`Intent templates: ${planSummary.templates.join(", ")}`);
+  }
+
+  const strategyLines = [
+    ...formatProcessPolicies(planSummary.intent),
+    ...formatSitePolicies(planSummary.intent.sitePolicies),
+    ...formatGroupDefaults(planSummary.groupDefaults),
+  ];
+
+  if (strategyLines.length > 0) {
+    lines.push(`Intent strategies (${strategyLines.length}):`);
+    lines.push(...strategyLines.map((line) => `- ${line}`));
+  }
+
+  lines.push(`Generated rules: ${planSummary.generatedRules}`);
+
+  if (planSummary.notes.length > 0) {
+    lines.push(...planSummary.notes.map((note) => `- ${note}`));
+  }
+
+  return lines;
+}
+
+function formatProcessPolicies(intent: IntentIR): string[] {
+  return intent.processPolicies.map((policy) => {
+    const target = formatProcessMatchers(policy.match);
+    return `${target} -> ${policy.outboundGroup} via ${policy.inbound}`;
+  });
+}
+
+function formatProcessMatchers(match: IntentIR["processPolicies"][number]["match"]): string {
+  const values = [...(match.processName ?? []), ...(match.bundleId ?? [])];
+  if (values.length === 0) {
+    return "process flow";
+  }
+  return values.join(", ");
+}
+
+function formatSitePolicies(sitePolicies: readonly IntentSitePolicy[]): string[] {
+  return sitePolicies.slice(0, 8).map((policy) => {
+    const matcher = describeSiteMatch(policy);
+    if (policy.action.type === "reject") {
+      return `${matcher} -> reject`;
+    }
+    return `${matcher} -> ${policy.action.outboundGroup}`;
+  });
+}
+
+function describeSiteMatch(policy: IntentSitePolicy): string {
+  if (policy.match.domainSuffix?.length) {
+    return policy.match.domainSuffix.join(", ");
+  }
+  if (policy.match.domain?.length) {
+    return policy.match.domain.join(", ");
+  }
+  if (policy.match.ruleSet?.length) {
+    return `rule-set ${policy.match.ruleSet.join(", ")}`;
+  }
+  if (policy.match.inbound?.length) {
+    return `inbound ${policy.match.inbound.join(", ")}`;
+  }
+  if (policy.match.protocol) {
+    return `protocol ${policy.match.protocol}`;
+  }
+  return policy.name ?? "generated policy";
+}
+
+function formatGroupDefaults(groupDefaults: Record<string, unknown>): string[] {
+  const knownGroups = [
+    ["processProxy", "default Process-Proxy"],
+    ["aiOut", "default AI-Out"],
+    ["devCommonOut", "default Dev-Common-Out"],
+    ["stitchOut", "default Stitch-Out"],
+  ] as const;
+
+  const lines: string[] = [];
+  for (const [key, label] of knownGroups) {
+    const override = groupDefaults[key];
+    if (!override || typeof override !== "object" || Array.isArray(override)) {
+      continue;
+    }
+    const record = override as { defaultTarget?: string; defaultNodePattern?: string };
+    if (!record.defaultTarget && !record.defaultNodePattern) {
+      continue;
+    }
+    lines.push(
+      `${label} -> ${record.defaultTarget ?? "(unchanged)"}${
+        record.defaultNodePattern ? ` (pattern ${record.defaultNodePattern})` : ""
+      }`,
+    );
+  }
+  return lines;
+}
+
+function formatVerificationSummary(report: VerificationReport): string[] {
+  const passed = report.scenarios.filter((scenario) => scenario.passed).length;
+  const lines = [`Verified scenarios: ${passed}/${report.scenarios.length}`];
+  lines.push(...report.scenarios.map((scenario) => formatVerificationScenario(scenario)));
+  return lines;
+}
+
+function formatVerificationScenario(scenario: VerificationScenarioResult): string {
+  const status = scenario.passed ? "PASS" : "FAIL";
+  return `- [${status}] ${scenario.name} -> ${scenario.expectedOutboundTag} via ${scenario.inboundTag}`;
+}
+
+function renderCliSummary(lines: readonly string[]): string {
+  const ansi = createAnsiStyler();
+  return lines
+    .map((line) => {
+      if (line.startsWith("Config:") || line.startsWith("Rules:")) {
+        return ansi.header(line);
+      }
+      if (line.startsWith("Doctor:")) {
+        return ansi.section(line);
+      }
+      if (line.startsWith("Intent:") || line.startsWith("Intent templates:")) {
+        return ansi.section(line);
+      }
+      if (line.startsWith("Intent strategies") || line.startsWith("Verified scenarios:")) {
+        return ansi.section(line);
+      }
+      if (line.startsWith("- [PASS]")) {
+        return ansi.success(line);
+      }
+      if (line.startsWith("- [WARN]") || line.startsWith("Warnings:")) {
+        return ansi.warn(line);
+      }
+      if (line.startsWith("- [FAIL]")) {
+        return ansi.fail(line);
+      }
+      if (
+        line.startsWith("Live:") ||
+        line.startsWith("Backup:") ||
+        line.startsWith("LaunchAgent:")
+      ) {
+        return ansi.success(line);
+      }
+      if (line.startsWith("Runtime: not started")) {
+        return ansi.warn(line);
+      }
+      if (line.startsWith("Next:")) {
+        return ansi.info(line);
+      }
+      return line;
+    })
+    .join("\n");
+}
+
+function createAnsiStyler(): {
+  header: (value: string) => string;
+  section: (value: string) => string;
+  success: (value: string) => string;
+  warn: (value: string) => string;
+  fail: (value: string) => string;
+  info: (value: string) => string;
+} {
+  const enabled = process.stdout.isTTY === true && process.env.NO_COLOR === undefined;
+
+  const wrap = (code: string, value: string): string =>
+    enabled ? `\u001B[${code}m${value}\u001B[0m` : value;
+
+  return {
+    header: (value) => wrap("1;36", value),
+    section: (value) => wrap("1;34", value),
+    success: (value) => wrap("32", value),
+    warn: (value) => wrap("33", value),
+    fail: (value) => wrap("31", value),
+    info: (value) => wrap("36", value),
+  };
 }
 
 async function pathExists(filePath: string): Promise<boolean> {
