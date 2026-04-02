@@ -1,0 +1,20 @@
+{
+  "name": "Google Stitch stays on the dedicated US egress",
+  "activeRuleSetTags": ["geosite-cn", "geoip-cn", "geosite-google", "geosite-github"],
+  "verificationScenarios": [
+    {
+      "id": "stitch-us",
+      "name": "Google Stitch",
+      "url": "https://stitch.withgoogle.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutbound": "Stitch-Out"
+    },
+    {
+      "id": "github-dev",
+      "name": "GitHub",
+      "url": "https://github.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutbound": "Dev-Common-Out"
+    }
+  ]
+}

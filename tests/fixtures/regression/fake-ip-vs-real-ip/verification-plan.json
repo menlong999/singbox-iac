@@ -1,0 +1,61 @@
+{
+  "dnsChecks": [
+    {
+      "domain": "nas.adrop.top",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-remote-cn"
+    },
+    {
+      "domain": "chatgpt.com",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-local-default"
+    }
+  ],
+  "routeChecks": [
+    {
+      "id": "local-nas",
+      "name": "Local NAS",
+      "target": "https://nas.adrop.top/",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "direct",
+      "expectedRuleHint": "direct route"
+    },
+    {
+      "id": "chatgpt-browser",
+      "name": "ChatGPT browser",
+      "target": "https://chatgpt.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "AI-Out",
+      "expectedRuleHint": "AI service rule"
+    }
+  ],
+  "egressChecks": [
+    {
+      "id": "local-nas",
+      "target": "https://api.ip.sb/geoip",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "direct",
+      "expectedCountry": ["CN"]
+    },
+    {
+      "id": "chatgpt-browser",
+      "target": "https://api.ip.sb/geoip",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "AI-Out",
+      "expectedCountry": ["HK"]
+    }
+  ],
+  "appChecks": [],
+  "protocolChecks": [
+    {
+      "id": "protocol-local-nas",
+      "target": "https://nas.adrop.top/",
+      "expectTCPOnly": true
+    },
+    {
+      "id": "protocol-chatgpt-browser",
+      "target": "https://chatgpt.com/favicon.ico",
+      "expectTCPOnly": true
+    }
+  ]
+}

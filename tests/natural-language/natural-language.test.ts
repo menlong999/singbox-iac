@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import YAML from "yaml";
 
 import {
+  analyzePrompt,
   generateRulesFromPrompt,
   selectVerificationScenariosForPrompt,
   updateBuilderAuthoring,
@@ -82,6 +83,14 @@ describe("natural language authoring", () => {
           override.expectedOutbound === "SG",
       ),
     ).toBe(true);
+  });
+
+  it("reports ambiguity diagnostics for vague developer routing prompts", () => {
+    const analysis = analyzePrompt("AI 都走好一点的节点，GitHub 大部分走香港");
+
+    expect(analysis.ambiguities.length).toBeGreaterThan(0);
+    expect(analysis.ambiguities.some((ambiguity) => ambiguity.includes("好一点的节点"))).toBe(true);
+    expect(analysis.ambiguities.some((ambiguity) => ambiguity.includes("大部分"))).toBe(true);
   });
 
   it("keeps OnlyAI pinning available when the prompt asks for it explicitly", () => {

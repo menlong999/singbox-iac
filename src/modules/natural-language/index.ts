@@ -34,6 +34,11 @@ export interface NaturalLanguagePlan {
   readonly verificationOverrides?: readonly NaturalLanguageVerificationOverride[];
 }
 
+export interface NaturalLanguagePromptAnalysis {
+  readonly plan: NaturalLanguagePlan;
+  readonly ambiguities: readonly string[];
+}
+
 export interface PromptSelectableVerificationScenario {
   readonly id: string;
   readonly name: string;
@@ -137,7 +142,30 @@ const processAliasDefinitions = [
   "google antigravity",
 ];
 
+const ambiguousPhraseDefinitions = [
+  "快一点",
+  "快点",
+  "大部分",
+  "差不多",
+  "好一点",
+  "好点",
+  "更好的节点",
+  "更好一点的节点",
+  "最好节点",
+  "好的节点",
+  "好一点的节点",
+  "better node",
+  "good node",
+  "faster",
+  "mostly",
+  "approximately",
+];
+
 export function generateRulesFromPrompt(prompt: string): NaturalLanguagePlan {
+  return analyzePrompt(prompt).plan;
+}
+
+export function analyzePrompt(prompt: string): NaturalLanguagePromptAnalysis {
   const text = normalizePrompt(prompt);
   const clauses = splitClauses(text);
   const templateIds = new Set<string>();
@@ -146,6 +174,7 @@ export function generateRulesFromPrompt(prompt: string): NaturalLanguagePlan {
   const notes: string[] = [];
   const verificationOverrides: NaturalLanguageVerificationOverride[] = [];
   const groupDefaults: NonNullable<NaturalLanguagePlan["groupDefaults"]> = {};
+  const ambiguities = new Set<string>();
 
   const parsedInterval = parseScheduleIntervalMinutes(text);
 
@@ -156,6 +185,16 @@ export function generateRulesFromPrompt(prompt: string): NaturalLanguagePlan {
     const hasAiCategory = hasTemplateAlias(clause, "developer-ai-sites");
     const hasDeveloperCategory = hasTemplateAlias(clause, "developer-common-sites");
     const hasStitchIntent = ["google stitch", "stitch"].some((alias) => clause.includes(alias));
+    const matchedDomains = new Set<string>();
+    const explicitDomains = extractExplicitDomains(clause);
+
+    for (const ambiguousPhrase of ambiguousPhraseDefinitions) {
+      if (clause.includes(ambiguousPhrase)) {
+        ambiguities.add(
+          `Prompt clause "${clause}" is ambiguous because it uses "${ambiguousPhrase}".`,
+        );
+      }
+    }
 
     for (const { aliases, templateId } of categoryTemplateDefinitions) {
       if (aliases.some((alias) => clause.includes(alias))) {
@@ -197,7 +236,6 @@ export function generateRulesFromPrompt(prompt: string): NaturalLanguagePlan {
       }
     }
 
-    const matchedDomains = new Set<string>();
     for (const definition of siteAliasDefinitions) {
       if (definition.aliases.some((alias) => clause.includes(alias))) {
         for (const domain of definition.domains) {
@@ -206,8 +244,29 @@ export function generateRulesFromPrompt(prompt: string): NaturalLanguagePlan {
       }
     }
 
-    for (const domain of extractExplicitDomains(clause)) {
+    for (const domain of explicitDomains) {
       matchedDomains.add(domain);
+    }
+
+    const referencesKnownIntent =
+      hasProcessIntent ||
+      hasAiCategory ||
+      hasDeveloperCategory ||
+      hasStitchIntent ||
+      matchedDomains.size > 0 ||
+      categoryTemplateDefinitions.some(({ aliases }) =>
+        aliases.some((alias) => clause.includes(alias)),
+      );
+
+    if (
+      referencesKnownIntent &&
+      !route &&
+      parseScheduleIntervalMinutes(clause) === undefined &&
+      !clause.includes("更新")
+    ) {
+      ambiguities.add(
+        `Prompt clause "${clause}" references a target or category but does not say where it should route.`,
+      );
     }
 
     if (matchedDomains.size > 0 && route && !hasStitchIntent) {
@@ -242,13 +301,16 @@ export function generateRulesFromPrompt(prompt: string): NaturalLanguagePlan {
   const mergedTemplates = mergeRuleTemplates([...templateIds]);
 
   return {
-    beforeBuiltins: dedupeRules([...mergedTemplates.beforeBuiltins, ...beforeBuiltins]),
-    afterBuiltins: dedupeRules([...mergedTemplates.afterBuiltins, ...afterBuiltins]),
-    templateIds: [...templateIds],
-    notes,
-    ...(parsedInterval ? { scheduleIntervalMinutes: parsedInterval } : {}),
-    ...(Object.keys(groupDefaults).length > 0 ? { groupDefaults } : {}),
-    ...(verificationOverrides.length > 0 ? { verificationOverrides } : {}),
+    plan: {
+      beforeBuiltins: dedupeRules([...mergedTemplates.beforeBuiltins, ...beforeBuiltins]),
+      afterBuiltins: dedupeRules([...mergedTemplates.afterBuiltins, ...afterBuiltins]),
+      templateIds: [...templateIds],
+      notes,
+      ...(parsedInterval ? { scheduleIntervalMinutes: parsedInterval } : {}),
+      ...(Object.keys(groupDefaults).length > 0 ? { groupDefaults } : {}),
+      ...(verificationOverrides.length > 0 ? { verificationOverrides } : {}),
+    },
+    ambiguities: [...ambiguities],
   };
 }
 

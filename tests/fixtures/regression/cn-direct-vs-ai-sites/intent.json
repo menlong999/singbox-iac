@@ -1,0 +1,19 @@
+{
+  "version": "v1",
+  "globals": {},
+  "sitePolicies": [
+    {
+      "placement": "beforeBuiltins",
+      "name": "OpenRouter uses AI-Out",
+      "match": {
+        "domainSuffix": ["openrouter.ai"]
+      },
+      "action": {
+        "type": "route",
+        "outboundGroup": "AI-Out"
+      }
+    }
+  ],
+  "processPolicies": [],
+  "localOverrides": {}
+}

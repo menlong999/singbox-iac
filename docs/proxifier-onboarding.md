@@ -18,6 +18,8 @@ Typical files:
 - `bundles/antigravity.txt`
 - `bundles/cursor.txt`
 - `bundles/developer-ai-cli.txt`
+- `bundle-specs/antigravity.yaml`
+- `bundle-specs/cursor.yaml`
 - `all-processes.txt`
 
 ## Fast Path
@@ -42,6 +44,18 @@ To see the supported bundle presets:
 
 ```bash
 singbox-iac proxifier bundles
+```
+
+To inspect one declarative bundle:
+
+```bash
+singbox-iac proxifier bundles show antigravity
+```
+
+To render one bundle spec as YAML:
+
+```bash
+singbox-iac proxifier bundles render antigravity
 ```
 
 ## Endpoint

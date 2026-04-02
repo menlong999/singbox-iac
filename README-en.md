@@ -140,6 +140,7 @@ The other common need is service-level routing:
 - Sync local `.srs` rule sets automatically
 - Publish validated configs to `~/.config/sing-box/config.json`
 - Install `launchd` schedules for recurring updates on macOS
+- Use an internal `RuntimeMode` planning layer to keep browser-proxy, process-proxy, and headless update defaults consistent
 
 ## Install
 
@@ -171,6 +172,8 @@ singbox-iac update
 - `update`: refresh the subscription and apply the latest config
 
 Everything else can be treated as advanced commands for debugging or fine-grained control.
+
+`RuntimeMode` is an internal concept; users do not need to choose one manually. Onboarding and `update` infer `browser-proxy`, `process-proxy`, or `headless-daemon` and use that to guide visible verification and runtime defaults. See [docs/runtime-modes.md](./docs/runtime-modes.md).
 
 ### One-step onboarding
 
@@ -265,8 +268,16 @@ The authoring layer supports:
 
 - deterministic local intent parsing by default
 - optional local AI CLI integration
-- preview before writing
+- `--strict` to reject vague requests instead of guessing
+- `--diff` to inspect `Intent IR / rules / config` changes before writing
+- `--emit-intent-ir` to print the structured intent layer directly
 - closed-loop update after rule generation
+
+Recommended before applying a production routing change:
+
+```bash
+singbox-iac use 'GitHub and developer sites go through Hong Kong, Gemini goes through Singapore' --strict --diff
+```
 
 ## Proxifier Onboarding
 
@@ -284,12 +295,22 @@ It contains:
 - `bundles/antigravity.txt`
 - `bundles/cursor.txt`
 - `bundles/developer-ai-cli.txt`
+- `bundle-specs/antigravity.yaml`
+- `bundle-specs/cursor.yaml`
 - `all-processes.txt`
 
 If you only want to regenerate the Proxifier helper files:
 
 ```bash
 singbox-iac proxifier scaffold --prompt 'Antigravity process traffic goes through the US and Cursor also uses a dedicated ingress'
+```
+
+You can also inspect or export declarative bundle specs directly:
+
+```bash
+singbox-iac proxifier bundles
+singbox-iac proxifier bundles show antigravity
+singbox-iac proxifier bundles render antigravity
 ```
 
 ## How It Works With sing-box
@@ -339,6 +360,8 @@ singbox-iac verify
 singbox-iac update
 singbox-iac doctor
 singbox-iac proxifier bundles
+singbox-iac proxifier bundles show antigravity
+singbox-iac proxifier bundles render antigravity
 singbox-iac proxifier scaffold
 singbox-iac schedule install
 singbox-iac schedule remove

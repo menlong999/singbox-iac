@@ -124,4 +124,14 @@ describe("authoring providers", () => {
       ),
     ).toBe(true);
   });
+
+  it("rejects ambiguous prompts in strict mode", async () => {
+    await expect(
+      generateAuthoringPlan({
+        prompt: "AI 都走好一点的节点",
+        provider: "deterministic",
+        strict: true,
+      }),
+    ).rejects.toThrow(/Prompt is ambiguous in strict mode/);
+  });
 });

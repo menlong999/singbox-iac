@@ -1,0 +1,23 @@
+{
+  "version": "v1",
+  "globals": {},
+  "sitePolicies": [
+    {
+      "placement": "afterBuiltins",
+      "name": "Local LAN stays direct",
+      "match": {
+        "domainSuffix": ["adrop.top"]
+      },
+      "action": {
+        "type": "route",
+        "outboundGroup": "direct"
+      }
+    }
+  ],
+  "processPolicies": [],
+  "localOverrides": {
+    "hosts": {
+      "nas.adrop.top": "192.168.50.10"
+    }
+  }
+}

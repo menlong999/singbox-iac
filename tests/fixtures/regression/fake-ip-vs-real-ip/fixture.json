@@ -1,0 +1,20 @@
+{
+  "name": "DNS stays in real-ip mode while local domains stay direct",
+  "activeRuleSetTags": ["geosite-cn", "geoip-cn"],
+  "verificationScenarios": [
+    {
+      "id": "local-nas",
+      "name": "Local NAS",
+      "url": "https://nas.adrop.top/",
+      "inbound": "in-mixed",
+      "expectedOutbound": "direct"
+    },
+    {
+      "id": "chatgpt-browser",
+      "name": "ChatGPT browser",
+      "url": "https://chatgpt.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutbound": "AI-Out"
+    }
+  ]
+}

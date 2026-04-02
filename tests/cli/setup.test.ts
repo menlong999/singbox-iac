@@ -100,6 +100,7 @@ describe("setup command", () => {
     expect(readFileSync(proxifierGuidePath, "utf8")).toContain("Proxifier Onboarding");
     expect(readFileSync(proxifierBundlePath, "utf8")).toContain("language_server_macos_arm");
     expect(readFileSync(stagingPath, "utf8")).toContain('"type": "trojan"');
+    expect(output).toContain("Runtime mode: process-proxy");
     expect(output).toContain("Doctor:");
     expect(output).toContain("Rule set 1/");
     expect(output).toContain("Proxifier guide:");

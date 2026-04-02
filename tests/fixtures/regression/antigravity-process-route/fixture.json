@@ -1,0 +1,27 @@
+{
+  "name": "Antigravity bundle matching produces stable process-aware verification",
+  "activeRuleSetTags": ["geosite-cn", "geoip-cn", "geosite-google", "geosite-github"],
+  "verificationScenarios": [
+    {
+      "id": "antigravity-docs",
+      "name": "Antigravity docs",
+      "url": "https://antigravity.google/docs",
+      "inbound": "in-proxifier",
+      "expectedOutbound": "Process-Proxy"
+    },
+    {
+      "id": "antigravity-auth",
+      "name": "Antigravity auth",
+      "url": "https://oauth2.googleapis.com/.well-known/openid-configuration",
+      "inbound": "in-proxifier",
+      "expectedOutbound": "Process-Proxy"
+    },
+    {
+      "id": "github-browser",
+      "name": "GitHub browser",
+      "url": "https://github.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutbound": "Dev-Common-Out"
+    }
+  ]
+}

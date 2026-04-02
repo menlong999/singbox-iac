@@ -1,0 +1,19 @@
+{
+  "version": "v1",
+  "globals": {},
+  "sitePolicies": [],
+  "processPolicies": [
+    {
+      "name": "Antigravity via Proxifier",
+      "match": {
+        "processName": ["Antigravity.app", "Antigravity", "language_server_macos_arm"]
+      },
+      "inbound": "in-proxifier",
+      "outboundGroup": "US",
+      "verify": {
+        "expectProxyHit": true
+      }
+    }
+  ],
+  "localOverrides": {}
+}

@@ -38,4 +38,31 @@ describe("use command", () => {
       }),
     );
   });
+
+  it("forwards strict/diff/emit-intent-ir flags to the author flow", async () => {
+    const { registerUseCommand } = await import("../../src/cli/commands/use.js");
+    const program = new Command();
+    registerUseCommand(program);
+
+    await program.parseAsync([
+      "node",
+      "singbox-iac",
+      "use",
+      "GitHub 走香港",
+      "--diff",
+      "--emit-intent-ir",
+      "--strict",
+    ]);
+
+    expect(runAuthorFlow).toHaveBeenCalledTimes(1);
+    expect(runAuthorFlow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: "GitHub 走香港",
+        diff: true,
+        emitIntentIr: true,
+        strict: true,
+        update: true,
+      }),
+    );
+  });
 });

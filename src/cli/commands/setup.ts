@@ -8,7 +8,7 @@ import type { Command } from "commander";
 
 import { loadConfig } from "../../config/load-config.js";
 import { generateAuthoringPlan } from "../../modules/authoring/index.js";
-import { buildConfigArtifact } from "../../modules/build/index.js";
+import { buildConfigArtifact, resolveEffectiveIntent } from "../../modules/build/index.js";
 import { runDoctor } from "../../modules/doctor/index.js";
 import { initWorkspace } from "../../modules/init/index.js";
 import { applyConfig, checkConfig, resolveSingBoxBinary } from "../../modules/manager/index.js";
@@ -23,6 +23,11 @@ import {
   writeProxifierScaffold,
 } from "../../modules/proxifier/index.js";
 import { syncLocalRuleSets } from "../../modules/rule-set-sync/index.js";
+import {
+  getRuntimeModeDefaults,
+  inferRuntimeMode,
+  selectVerificationScenariosForRuntimeMode,
+} from "../../modules/runtime-mode/index.js";
 import { installLaunchdSchedule } from "../../modules/schedule/index.js";
 import {
   type VerificationReport,
@@ -187,8 +192,6 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
   const shouldApply = options.apply === true || options.ready === true;
   const shouldInstallSchedule = options.installSchedule === true || options.ready === true;
   const shouldRun = options.run === true;
-  const shouldOpenBrowser =
-    options.openBrowser === true || (options.ready === true && options.run === true);
 
   if (options.skipBuild && (shouldVerify || shouldApply)) {
     throw new Error("setup cannot use --skip-build together with --verify or --apply.");
@@ -266,6 +269,30 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
   const selectedProxifierBundles = options.prompt
     ? selectProxifierBundlesFromPrompt(options.prompt)
     : [];
+  const effectiveIntent = await resolveEffectiveIntent(effectiveConfig);
+  const runtimeMode = inferRuntimeMode({
+    phase: "onboarding",
+    intent: effectiveIntent,
+    config: effectiveConfig,
+    proxifierBundleIds: selectedProxifierBundles,
+    runInForeground: shouldRun,
+    ...(options.prompt ? { prompt: options.prompt } : {}),
+  });
+  const runtimeModeDefaults = getRuntimeModeDefaults(runtimeMode);
+  const shouldOpenBrowser =
+    options.openBrowser === true ||
+    (options.openBrowser === undefined &&
+      options.ready === true &&
+      options.run === true &&
+      runtimeModeDefaults.openVisibleBrowserByDefault);
+
+  lines.push(`Runtime mode: ${runtimeMode}`);
+  lines.push(`Runtime DNS mode: ${runtimeModeDefaults.dnsMode}`);
+  lines.push(
+    `Runtime listeners: ${runtimeModeDefaults.preferredListeners.map((entry) => `in-${entry}`).join(", ")}`,
+  );
+  lines.push(`Schedule recommended: ${runtimeModeDefaults.scheduleRecommended ? "yes" : "no"}`);
+
   if (options.proxifierOutDir || selectedProxifierBundles.length > 0) {
     const proxifierOutputDir = resolvePath(
       options.proxifierOutDir ?? path.join(path.dirname(configPath), "proxifier"),
@@ -425,14 +452,15 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
     );
 
     if (shouldOpenBrowser) {
+      const runtimeScenarios = selectVerificationScenariosForRuntimeMode(
+        runtimeMode,
+        effectiveConfig.verification.scenarios,
+      );
       const selectedScenarios = options.prompt
-        ? selectVerificationScenariosForPrompt(
-            options.prompt,
-            effectiveConfig.verification.scenarios,
-          )
-        : effectiveConfig.verification.scenarios.slice(
+        ? selectVerificationScenariosForPrompt(options.prompt, runtimeScenarios)
+        : runtimeScenarios.slice(
             0,
-            Math.min(3, effectiveConfig.verification.scenarios.length),
+            Math.min(runtimeModeDefaults.visibleBrowserScenarioLimit, runtimeScenarios.length),
           );
 
       const visibleScenarios = selectedScenarios.map((scenario) => ({

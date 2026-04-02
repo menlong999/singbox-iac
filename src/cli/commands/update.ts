@@ -1,5 +1,7 @@
 import type { Command } from "commander";
 
+import { resolveEffectiveIntent } from "../../modules/build/index.js";
+import { inferRuntimeMode } from "../../modules/runtime-mode/index.js";
 import { runUpdate } from "../../modules/update/index.js";
 import { resolveBuilderConfig } from "../command-helpers.js";
 
@@ -24,6 +26,11 @@ export function registerUpdateCommand(program: Command): void {
           "Update requires a builder config. Pass --config or create builder.config.local.yaml.",
         );
       }
+      const runtimeMode = inferRuntimeMode({
+        phase: "update",
+        config: builderConfig,
+        intent: await resolveEffectiveIntent(builderConfig),
+      });
 
       const result = await runUpdate({
         config: builderConfig,
@@ -46,6 +53,7 @@ export function registerUpdateCommand(program: Command): void {
 
       process.stdout.write(
         `${[
+          `Runtime mode: ${runtimeMode}`,
           `Generated ${result.build.nodeCount} nodes.`,
           `Staging: ${result.build.outputPath}`,
           verificationSummary,

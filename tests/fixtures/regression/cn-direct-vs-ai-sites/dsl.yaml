@@ -1,0 +1,6 @@
+version: 1
+beforeBuiltins:
+  - name: "OpenRouter uses AI-Out"
+    domainSuffix: "openrouter.ai"
+    route: "AI-Out"
+afterBuiltins: []

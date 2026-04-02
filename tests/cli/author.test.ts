@@ -127,7 +127,7 @@ schedule:
     expect(writeSpy).toHaveBeenCalled();
   });
 
-  it("prints a preview diff without writing files", async () => {
+  it("prints a diff preview without writing files", async () => {
     const dir = mkdtempSync(path.join(tmpdir(), "singbox-iac-author-preview-"));
     tempDirs.push(dir);
 
@@ -215,16 +215,125 @@ authoring:
       "OpenRouter 走香港，每45分钟自动更新",
       "--subscription-file",
       fixturePath,
-      "--preview",
+      "--diff",
     ]);
 
     const output = writeSpy.mock.calls.map((call) => String(call[0])).join("");
-    expect(output).toContain("Preview mode: no files were written.");
+    expect(output).toContain("Diff mode: no files were written.");
+    expect(output).toContain("Intent IR diff:");
     expect(output).toContain("Rules diff:");
     expect(output).toContain("Builder config diff:");
     expect(output).toContain("Staging config diff:");
     expect(readFileSync(configPath, "utf8")).toBe(originalConfig);
     expect(readFileSync(rulesPath, "utf8")).toBe(initialRules);
+    expect(existsSync(stagingPath)).toBe(false);
+  });
+
+  it("can emit Intent IR without writing files", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "singbox-iac-author-intent-"));
+    tempDirs.push(dir);
+
+    const configPath = path.join(dir, "builder.config.yaml");
+    const rulesPath = path.join(dir, "custom.rules.yaml");
+    const stagingPath = path.join(dir, "staging.json");
+
+    writeFileSync(rulesPath, "version: 1\nbeforeBuiltins: []\nafterBuiltins: []\n");
+    writeFileSync(
+      configPath,
+      `version: 1
+subscription:
+  url: "https://example.com/subscription"
+  format: "base64-lines"
+  protocols:
+    - trojan
+output:
+  stagingPath: "${stagingPath}"
+  livePath: "${path.join(dir, "live.json")}"
+  backupPath: "${path.join(dir, "backup.json")}"
+runtime:
+  checkCommand: "sing-box check -c {{stagingPath}}"
+  reload:
+    kind: "signal"
+    processName: "sing-box"
+    signal: "HUP"
+listeners:
+  mixed:
+    enabled: true
+    listen: "127.0.0.1"
+    port: 39097
+  proxifier:
+    enabled: true
+    listen: "127.0.0.1"
+    port: 39091
+ruleSets: []
+groups:
+  processProxy:
+    type: "selector"
+    includes: ["US"]
+  aiOut:
+    type: "selector"
+    includes: ["HK", "US", "JP"]
+    defaultTarget: "HK"
+  devCommonOut:
+    type: "selector"
+    includes: ["HK", "US"]
+    defaultTarget: "HK"
+  stitchOut:
+    type: "selector"
+    includes: ["US"]
+    defaultTarget: "US"
+  global:
+    type: "urltest"
+    includes: ["HK", "US"]
+rules:
+  userRulesFile: "${rulesPath}"
+verification:
+  scenarios:
+    - id: "openrouter-hk"
+      name: "OpenRouter uses AI path"
+      url: "https://openrouter.ai/favicon.ico"
+      inbound: "in-mixed"
+      expectedOutbound: "AI-Out"
+schedule:
+  enabled: false
+  intervalMinutes: 30
+authoring:
+  provider: "deterministic"
+  timeoutMs: 4000
+`,
+    );
+
+    const originalConfig = readFileSync(configPath, "utf8");
+    const originalRules = readFileSync(rulesPath, "utf8");
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await createProgram().parseAsync([
+      "node",
+      "singbox-iac",
+      "author",
+      "--config",
+      configPath,
+      "--prompt",
+      "OpenRouter 走香港",
+      "--emit-intent-ir",
+    ]);
+
+    const output = writeSpy.mock.calls.map((call) => String(call[0])).join("");
+    const parsed = JSON.parse(output) as {
+      sitePolicies: Array<{
+        action?: { outboundGroup?: string };
+        match?: { domainSuffix?: string[] };
+      }>;
+    };
+    expect(
+      parsed.sitePolicies.some(
+        (policy) =>
+          policy.action?.outboundGroup === "HK" &&
+          (policy.match?.domainSuffix ?? []).includes("openrouter.ai"),
+      ),
+    ).toBe(true);
+    expect(readFileSync(configPath, "utf8")).toBe(originalConfig);
+    expect(readFileSync(rulesPath, "utf8")).toBe(originalRules);
     expect(existsSync(stagingPath)).toBe(false);
   });
 

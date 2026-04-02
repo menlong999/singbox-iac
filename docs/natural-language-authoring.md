@@ -178,11 +178,47 @@ and writes a new staging config.
 
 With `--preview`, the command does not write anything. Instead it prints:
 
+- Intent IR diff
 - rules diff
 - builder config diff
 - staging config diff
 
 This is the safest way to inspect what a prompt or local AI CLI would change before touching your local files.
+
+## Audit-Friendly Flags
+
+Use these flags when you want stronger control over one-sentence authoring:
+
+- `--strict`
+  Reject vague language instead of guessing. This is recommended for production changes.
+- `--diff`
+  Print the `IntentIR` diff, rules diff, builder config diff, and staging config diff without writing files.
+- `--emit-intent-ir`
+  Print the generated `IntentIR` JSON and exit without touching local files.
+
+Examples:
+
+```bash
+./node_modules/.bin/tsx src/cli/index.ts use \
+  'GitHub 这类开发类都走香港，Gemini 走新加坡' \
+  --strict --diff
+```
+
+```bash
+./node_modules/.bin/tsx src/cli/index.ts author \
+  --config ./builder.config.local.yaml \
+  --prompt 'OpenRouter 走香港' \
+  --emit-intent-ir
+```
+
+In strict mode, the command rejects prompts like:
+
+- `快一点`
+- `大部分`
+- `差不多`
+- `AI 都走好一点的节点`
+
+Those phrases are too vague to compile into a stable routing policy.
 
 ## Exec Provider
 

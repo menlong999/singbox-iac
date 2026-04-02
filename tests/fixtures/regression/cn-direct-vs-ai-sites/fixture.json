@@ -1,0 +1,27 @@
+{
+  "name": "Mainland traffic stays direct while custom AI sites stay proxied",
+  "activeRuleSetTags": ["geosite-cn", "geoip-cn"],
+  "verificationScenarios": [
+    {
+      "id": "openrouter-ai",
+      "name": "OpenRouter",
+      "url": "https://openrouter.ai/",
+      "inbound": "in-mixed",
+      "expectedOutbound": "AI-Out"
+    },
+    {
+      "id": "chatgpt-ai",
+      "name": "ChatGPT",
+      "url": "https://chatgpt.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutbound": "AI-Out"
+    },
+    {
+      "id": "baidu-direct",
+      "name": "Baidu",
+      "url": "https://www.baidu.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutbound": "direct"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "name": "GitHub and OpenAI can diverge by default outbound group",
+  "activeRuleSetTags": ["geosite-cn", "geoip-cn", "geosite-github"],
+  "groupOverrides": {
+    "aiOut": {
+      "defaultTarget": "SG"
+    },
+    "devCommonOut": {
+      "defaultTarget": "HK"
+    }
+  },
+  "verificationScenarios": [
+    {
+      "id": "chatgpt-sg",
+      "name": "ChatGPT",
+      "url": "https://chatgpt.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutbound": "AI-Out"
+    },
+    {
+      "id": "github-hk",
+      "name": "GitHub",
+      "url": "https://github.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutbound": "Dev-Common-Out"
+    },
+    {
+      "id": "baidu-direct",
+      "name": "Baidu",
+      "url": "https://www.baidu.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutbound": "direct"
+    }
+  ]
+}

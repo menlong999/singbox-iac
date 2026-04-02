@@ -1,0 +1,6 @@
+version: 1
+beforeBuiltins: []
+afterBuiltins:
+  - name: "Local LAN stays direct"
+    domainSuffix: "adrop.top"
+    route: "direct"

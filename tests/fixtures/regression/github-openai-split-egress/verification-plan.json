@@ -1,0 +1,86 @@
+{
+  "dnsChecks": [
+    {
+      "domain": "chatgpt.com",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-local-default"
+    },
+    {
+      "domain": "github.com",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-local-default"
+    },
+    {
+      "domain": "www.baidu.com",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-local-default"
+    }
+  ],
+  "routeChecks": [
+    {
+      "id": "chatgpt-sg",
+      "name": "ChatGPT",
+      "target": "https://chatgpt.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "AI-Out",
+      "expectedRuleHint": "AI service rule"
+    },
+    {
+      "id": "github-hk",
+      "name": "GitHub",
+      "target": "https://github.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "Dev-Common-Out",
+      "expectedRuleHint": "developer/common service rule"
+    },
+    {
+      "id": "baidu-direct",
+      "name": "Baidu",
+      "target": "https://www.baidu.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "direct",
+      "expectedRuleHint": "direct route"
+    }
+  ],
+  "egressChecks": [
+    {
+      "id": "chatgpt-sg",
+      "target": "https://api.ip.sb/geoip",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "AI-Out",
+      "expectedCountry": ["SG"]
+    },
+    {
+      "id": "github-hk",
+      "target": "https://api.ip.sb/geoip",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "Dev-Common-Out",
+      "expectedCountry": ["HK"]
+    },
+    {
+      "id": "baidu-direct",
+      "target": "https://api.ip.sb/geoip",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "direct",
+      "expectedCountry": ["CN"]
+    }
+  ],
+  "appChecks": [],
+  "protocolChecks": [
+    {
+      "id": "protocol-chatgpt-sg",
+      "target": "https://chatgpt.com/favicon.ico",
+      "expectTCPOnly": true
+    },
+    {
+      "id": "protocol-github-hk",
+      "target": "https://github.com/favicon.ico",
+      "expectTCPOnly": true
+    },
+    {
+      "id": "protocol-baidu-direct",
+      "target": "https://www.baidu.com/favicon.ico",
+      "expectTCPOnly": true
+    }
+  ]
+}

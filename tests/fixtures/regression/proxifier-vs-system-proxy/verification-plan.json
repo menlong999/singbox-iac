@@ -1,0 +1,92 @@
+{
+  "dnsChecks": [
+    {
+      "domain": "chatgpt.com",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-local-default"
+    },
+    {
+      "domain": "www.googleapis.com",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-local-default"
+    },
+    {
+      "domain": "www.baidu.com",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-local-default"
+    }
+  ],
+  "routeChecks": [
+    {
+      "id": "browser-chatgpt",
+      "name": "Browser ChatGPT",
+      "target": "https://chatgpt.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "AI-Out",
+      "expectedRuleHint": "AI service rule"
+    },
+    {
+      "id": "proxifier-antigravity",
+      "name": "Antigravity via Proxifier",
+      "target": "https://www.googleapis.com/discovery/v1/apis",
+      "inbound": "in-proxifier",
+      "expectedOutboundGroup": "Process-Proxy",
+      "expectedRuleHint": "protected proxifier precedence"
+    },
+    {
+      "id": "browser-baidu",
+      "name": "Mainland direct",
+      "target": "https://www.baidu.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "direct",
+      "expectedRuleHint": "direct route"
+    }
+  ],
+  "egressChecks": [
+    {
+      "id": "browser-chatgpt",
+      "target": "https://api.ip.sb/geoip",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "AI-Out",
+      "expectedCountry": ["HK"]
+    },
+    {
+      "id": "browser-baidu",
+      "target": "https://api.ip.sb/geoip",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "direct",
+      "expectedCountry": ["CN"]
+    }
+  ],
+  "appChecks": [
+    {
+      "id": "process-1",
+      "app": "Antigravity.app, Antigravity, language_server_macos_arm",
+      "expectedInbound": "in-proxifier",
+      "expectedOutboundGroup": "US"
+    },
+    {
+      "id": "scenario-proxifier-antigravity",
+      "app": "Antigravity via Proxifier",
+      "expectedInbound": "in-proxifier",
+      "expectedOutboundGroup": "Process-Proxy"
+    }
+  ],
+  "protocolChecks": [
+    {
+      "id": "protocol-browser-chatgpt",
+      "target": "https://chatgpt.com/favicon.ico",
+      "expectTCPOnly": true
+    },
+    {
+      "id": "protocol-proxifier-antigravity",
+      "target": "https://www.googleapis.com/discovery/v1/apis",
+      "expectTCPOnly": true
+    },
+    {
+      "id": "protocol-browser-baidu",
+      "target": "https://www.baidu.com/favicon.ico",
+      "expectTCPOnly": true
+    }
+  ]
+}

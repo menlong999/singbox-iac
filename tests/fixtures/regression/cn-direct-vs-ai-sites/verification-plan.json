@@ -1,0 +1,79 @@
+{
+  "dnsChecks": [
+    {
+      "domain": "openrouter.ai",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-remote-primary"
+    },
+    {
+      "domain": "chatgpt.com",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-local-default"
+    },
+    {
+      "domain": "www.baidu.com",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-local-default"
+    }
+  ],
+  "routeChecks": [
+    {
+      "id": "openrouter-ai",
+      "name": "OpenRouter",
+      "target": "https://openrouter.ai/",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "AI-Out",
+      "expectedRuleHint": "AI service rule"
+    },
+    {
+      "id": "chatgpt-ai",
+      "name": "ChatGPT",
+      "target": "https://chatgpt.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "AI-Out",
+      "expectedRuleHint": "AI service rule"
+    },
+    {
+      "id": "baidu-direct",
+      "name": "Baidu",
+      "target": "https://www.baidu.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "direct",
+      "expectedRuleHint": "direct route"
+    }
+  ],
+  "egressChecks": [
+    {
+      "id": "openrouter-ai",
+      "target": "https://api.ip.sb/geoip",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "AI-Out",
+      "expectedCountry": ["HK"]
+    },
+    {
+      "id": "baidu-direct",
+      "target": "https://api.ip.sb/geoip",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "direct",
+      "expectedCountry": ["CN"]
+    }
+  ],
+  "appChecks": [],
+  "protocolChecks": [
+    {
+      "id": "protocol-openrouter-ai",
+      "target": "https://openrouter.ai/",
+      "expectTCPOnly": true
+    },
+    {
+      "id": "protocol-chatgpt-ai",
+      "target": "https://chatgpt.com/favicon.ico",
+      "expectTCPOnly": true
+    },
+    {
+      "id": "protocol-baidu-direct",
+      "target": "https://www.baidu.com/favicon.ico",
+      "expectTCPOnly": true
+    }
+  ]
+}

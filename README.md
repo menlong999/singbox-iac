@@ -140,6 +140,7 @@ flowchart TD
 - 自动同步本地 `.srs` 规则集
 - 发布配置到 `~/.config/sing-box/config.json`
 - 通过 `launchd` 做定时更新
+- 内部 `RuntimeMode` 规划层，用于统一浏览器代理、进程级代理和无头更新路径的默认行为
 
 ## 安装
 
@@ -171,6 +172,8 @@ singbox-iac update
 - `update`：日常更新订阅并自动在运行中的 `sing-box` 上生效
 
 其余命令都可以理解为高级命令，主要用于调试、排障或更细粒度控制。
+
+`RuntimeMode` 是内部概念，不要求用户手动选择。当前 onboarding 和 `update` 会自动推断 `browser-proxy`、`process-proxy` 或 `headless-daemon`，并据此调整可见验证和运行时默认行为。详见 [docs/runtime-modes.md](./docs/runtime-modes.md)。
 
 ### 一步完成初始化
 
@@ -265,8 +268,16 @@ singbox-iac author \
 
 - 默认使用本地确定性意图解析
 - 可选接入本地 AI CLI
-- 写入前先 preview
+- 支持 `--strict`，遇到模糊表述直接失败
+- 支持 `--diff`，先看 `Intent IR / 规则 / 配置` 变化再决定是否应用
+- 支持 `--emit-intent-ir`，直接输出结构化意图层
 - 生成规则后直接闭环 update
+
+推荐在正式改策略前先看一次 diff：
+
+```bash
+singbox-iac use 'GitHub 这类开发类都走香港，Gemini 走新加坡' --strict --diff
+```
 
 ## Proxifier 上手
 
@@ -284,12 +295,22 @@ singbox-iac author \
 - `bundles/antigravity.txt`
 - `bundles/cursor.txt`
 - `bundles/developer-ai-cli.txt`
+- `bundle-specs/antigravity.yaml`
+- `bundle-specs/cursor.yaml`
 - `all-processes.txt`
 
 如果你只想重新生成这部分，不需要重跑全部 onboarding：
 
 ```bash
 singbox-iac proxifier scaffold --prompt 'Antigravity 进程级走美国，Cursor 也走独立入口'
+```
+
+也可以直接查看或导出声明式 bundle：
+
+```bash
+singbox-iac proxifier bundles
+singbox-iac proxifier bundles show antigravity
+singbox-iac proxifier bundles render antigravity
 ```
 
 ## 它和 sing-box 是怎么配合的
@@ -339,6 +360,8 @@ singbox-iac verify
 singbox-iac update
 singbox-iac doctor
 singbox-iac proxifier bundles
+singbox-iac proxifier bundles show antigravity
+singbox-iac proxifier bundles render antigravity
 singbox-iac proxifier scaffold
 singbox-iac schedule install
 singbox-iac schedule remove

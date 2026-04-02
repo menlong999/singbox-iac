@@ -119,8 +119,8 @@ schedule:
     expect(readFileSync(livePath, "utf8")).toContain('"type": "trojan"');
     expect(readFileSync(backupPath, "utf8")).toContain('"old":"config"');
     expect(writeSpy).toHaveBeenCalled();
-    expect(writeSpy.mock.calls.map((call) => String(call[0])).join("")).toContain(
-      "Reload: skipped",
-    );
+    const output = writeSpy.mock.calls.map((call) => String(call[0])).join("");
+    expect(output).toContain("Runtime mode: headless-daemon");
+    expect(output).toContain("Reload: skipped");
   });
 });

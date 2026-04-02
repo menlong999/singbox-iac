@@ -9,6 +9,9 @@ export function registerUseCommand(program: Command): void {
     .argument("<prompt>", "one-sentence routing intent")
     .option("-c, --config <path>", "path to builder config YAML")
     .option("--preview", "print diffs without writing any files")
+    .option("--diff", "print Intent IR and config diffs without writing any files")
+    .option("--emit-intent-ir", "print the generated Intent IR and exit without writing files")
+    .option("--strict", "reject ambiguous natural-language requests instead of guessing")
     .option("--subscription-url <url>", "override subscription URL when rebuilding")
     .option("--subscription-file <path>", "use a local subscription file instead of fetching")
     .option("--provider <provider>", "authoring provider: deterministic, auto, claude, exec")
@@ -22,6 +25,9 @@ export function registerUseCommand(program: Command): void {
         options: {
           readonly config?: string;
           readonly preview?: boolean;
+          readonly diff?: boolean;
+          readonly emitIntentIr?: boolean;
+          readonly strict?: boolean;
           readonly subscriptionUrl?: string;
           readonly subscriptionFile?: string;
           readonly provider?: "deterministic" | "auto" | "claude" | "exec";
@@ -37,6 +43,9 @@ export function registerUseCommand(program: Command): void {
           label: "org.singbox-iac.update",
           ...(options.config ? { config: options.config } : {}),
           ...(options.preview ? { preview: true } : {}),
+          ...(options.diff ? { diff: true } : {}),
+          ...(options.emitIntentIr ? { emitIntentIr: true } : {}),
+          ...(options.strict ? { strict: true } : {}),
           ...(options.subscriptionUrl ? { subscriptionUrl: options.subscriptionUrl } : {}),
           ...(options.subscriptionFile ? { subscriptionFile: options.subscriptionFile } : {}),
           ...(options.provider ? { provider: options.provider } : {}),
@@ -50,6 +59,7 @@ export function registerUseCommand(program: Command): void {
     );
 
   for (const optionName of [
+    "preview",
     "subscriptionUrl",
     "subscriptionFile",
     "provider",

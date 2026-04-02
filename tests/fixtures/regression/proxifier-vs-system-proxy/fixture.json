@@ -1,0 +1,35 @@
+{
+  "name": "Proxifier traffic stays isolated from normal browser routing",
+  "activeRuleSetTags": [
+    "geosite-cn",
+    "geoip-cn",
+    "geosite-google",
+    "geosite-google-gemini",
+    "geosite-anthropic",
+    "geosite-github",
+    "geosite-github-copilot"
+  ],
+  "verificationScenarios": [
+    {
+      "id": "browser-chatgpt",
+      "name": "Browser ChatGPT",
+      "url": "https://chatgpt.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutbound": "AI-Out"
+    },
+    {
+      "id": "proxifier-antigravity",
+      "name": "Antigravity via Proxifier",
+      "url": "https://www.googleapis.com/discovery/v1/apis",
+      "inbound": "in-proxifier",
+      "expectedOutbound": "Process-Proxy"
+    },
+    {
+      "id": "browser-baidu",
+      "name": "Mainland direct",
+      "url": "https://www.baidu.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutbound": "direct"
+    }
+  ]
+}

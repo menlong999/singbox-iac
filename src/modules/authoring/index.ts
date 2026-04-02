@@ -12,6 +12,7 @@ import { intentFromNaturalLanguagePlan } from "../intent/index.js";
 import {
   type NaturalLanguagePlan,
   type NaturalLanguageVerificationOverride,
+  analyzePrompt,
   generateRulesFromPrompt,
 } from "../natural-language/index.js";
 import { mergeRuleTemplates } from "../rule-templates/index.js";
@@ -88,12 +89,14 @@ export interface GenerateAuthoringPlanInput {
   readonly execCommand?: string;
   readonly execArgs?: readonly string[];
   readonly timeoutMs?: number;
+  readonly strict?: boolean;
   readonly runner?: AuthoringCommandRunner;
 }
 
 export interface GenerateAuthoringPlanResult {
   readonly plan: NaturalLanguagePlan;
   readonly intent: IntentIR;
+  readonly ambiguities: readonly string[];
   readonly providerRequested: AuthoringProvider;
   readonly providerUsed: Exclude<AuthoringProvider, "auto">;
 }
@@ -151,14 +154,24 @@ export async function generateAuthoringPlan(
   const providerRequested = input.provider ?? input.config?.authoring.provider ?? "deterministic";
   const timeoutMs = input.timeoutMs ?? input.config?.authoring.timeoutMs ?? defaultTimeoutMs;
   const runner = input.runner ?? runAuthoringCommand;
+  const promptAnalysis = analyzePrompt(input.prompt);
+
+  if (input.strict && promptAnalysis.ambiguities.length > 0) {
+    throw new Error(
+      `Prompt is ambiguous in strict mode:\n${promptAnalysis.ambiguities
+        .map((ambiguity) => `- ${ambiguity}`)
+        .join("\n")}`,
+    );
+  }
 
   if (providerRequested === "deterministic") {
-    const plan = generateRulesFromPrompt(input.prompt);
+    const plan = promptAnalysis.plan;
     return {
       providerRequested,
       providerUsed: "deterministic",
       plan,
       intent: intentFromNaturalLanguagePlan(plan),
+      ambiguities: promptAnalysis.ambiguities,
     };
   }
 
@@ -169,6 +182,7 @@ export async function generateAuthoringPlan(
       providerUsed: "claude",
       plan,
       intent: intentFromNaturalLanguagePlan(plan),
+      ambiguities: promptAnalysis.ambiguities,
     };
   }
 
@@ -188,6 +202,7 @@ export async function generateAuthoringPlan(
       providerUsed: "exec",
       plan,
       intent: intentFromNaturalLanguagePlan(plan),
+      ambiguities: promptAnalysis.ambiguities,
     };
   }
 
@@ -257,6 +272,7 @@ async function generateWithAuto(
   timeoutMs: number,
   runner: AuthoringCommandRunner,
 ): Promise<GenerateAuthoringPlanResult> {
+  const promptAnalysis = analyzePrompt(prompt);
   if (execCommand || config?.authoring.exec?.command) {
     try {
       const plan = await generateWithExec(
@@ -274,12 +290,14 @@ async function generateWithAuto(
         providerUsed: "exec",
         plan,
         intent: intentFromNaturalLanguagePlan(plan),
+        ambiguities: promptAnalysis.ambiguities,
       };
     } catch (error) {
       return fallbackDeterministic(
         prompt,
         "exec",
         error instanceof Error ? error.message : String(error),
+        promptAnalysis.ambiguities,
       );
     }
   }
@@ -293,12 +311,14 @@ async function generateWithAuto(
         providerUsed: "claude",
         plan,
         intent: intentFromNaturalLanguagePlan(plan),
+        ambiguities: promptAnalysis.ambiguities,
       };
     } catch (error) {
       return fallbackDeterministic(
         prompt,
         "claude",
         error instanceof Error ? error.message : String(error),
+        promptAnalysis.ambiguities,
       );
     }
   }
@@ -312,6 +332,7 @@ async function generateWithAuto(
     providerUsed: "deterministic",
     plan,
     intent: intentFromNaturalLanguagePlan(plan),
+    ambiguities: promptAnalysis.ambiguities,
   };
 }
 
@@ -598,6 +619,7 @@ function fallbackDeterministic(
   prompt: string,
   providerUsed: Exclude<AuthoringProvider, "auto" | "deterministic">,
   reason: string,
+  ambiguities: readonly string[],
 ): GenerateAuthoringPlanResult {
   const plan = appendNotes(generateRulesFromPrompt(prompt), [
     `Auto authoring fell back from ${providerUsed} to the deterministic parser: ${reason}`,
@@ -608,6 +630,7 @@ function fallbackDeterministic(
     providerUsed: "deterministic",
     plan,
     intent: intentFromNaturalLanguagePlan(plan),
+    ambiguities,
   };
 }
 

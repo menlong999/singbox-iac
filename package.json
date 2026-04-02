@@ -1,6 +1,6 @@
 {
   "name": "@singbox-iac/cli",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Policy-first subscription compiler for sing-box on macOS.",
   "repository": {
     "type": "git",
@@ -46,6 +46,7 @@
     "prepack": "npm run build",
     "release:check": "node ./scripts/release-check.mjs",
     "release:dry-run": "node ./scripts/release-dry-run.mjs",
+    "fixtures:regenerate": "tsx tests/regression/generate-fixtures.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "biome check .",

@@ -1,0 +1,61 @@
+{
+  "dnsChecks": [
+    {
+      "domain": "stitch.withgoogle.com",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-local-default"
+    },
+    {
+      "domain": "github.com",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-local-default"
+    }
+  ],
+  "routeChecks": [
+    {
+      "id": "stitch-us",
+      "name": "Google Stitch",
+      "target": "https://stitch.withgoogle.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "Stitch-Out",
+      "expectedRuleHint": "explicit stitch rule"
+    },
+    {
+      "id": "github-dev",
+      "name": "GitHub",
+      "target": "https://github.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "Dev-Common-Out",
+      "expectedRuleHint": "developer/common service rule"
+    }
+  ],
+  "egressChecks": [
+    {
+      "id": "stitch-us",
+      "target": "https://api.ip.sb/geoip",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "Stitch-Out",
+      "expectedCountry": ["US"]
+    },
+    {
+      "id": "github-dev",
+      "target": "https://api.ip.sb/geoip",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "Dev-Common-Out",
+      "expectedCountry": ["HK"]
+    }
+  ],
+  "appChecks": [],
+  "protocolChecks": [
+    {
+      "id": "protocol-stitch-us",
+      "target": "https://stitch.withgoogle.com/favicon.ico",
+      "expectTCPOnly": true
+    },
+    {
+      "id": "protocol-github-dev",
+      "target": "https://github.com/favicon.ico",
+      "expectTCPOnly": true
+    }
+  ]
+}

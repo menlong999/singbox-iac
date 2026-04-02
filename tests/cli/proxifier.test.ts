@@ -24,6 +24,40 @@ describe("proxifier command", () => {
     const output = writeSpy.mock.calls.map((call) => String(call[0])).join("");
     expect(output).toContain("antigravity: Antigravity");
     expect(output).toContain("developer-ai-cli: Developer AI CLI");
+    expect(output).toContain("copilot-cli: Copilot CLI");
+  });
+
+  it("shows and renders a declarative bundle spec", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "singbox-iac-proxifier-bundle-"));
+    tempDirs.push(dir);
+
+    const outputPath = path.join(dir, "antigravity.yaml");
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await createProgram().parseAsync([
+      "node",
+      "singbox-iac",
+      "proxifier",
+      "bundles",
+      "show",
+      "antigravity",
+    ]);
+    await createProgram().parseAsync([
+      "node",
+      "singbox-iac",
+      "proxifier",
+      "bundles",
+      "render",
+      "antigravity",
+      "--out",
+      outputPath,
+    ]);
+
+    const output = writeSpy.mock.calls.map((call) => String(call[0])).join("");
+    expect(output).toContain("ID: antigravity");
+    expect(output).toContain("Outbound: Process-Proxy");
+    expect(existsSync(outputPath)).toBe(true);
+    expect(readFileSync(outputPath, "utf8")).toContain("targetOutboundGroup: Process-Proxy");
   });
 
   it("generates a scaffold from config and prompt-derived bundles", async () => {
@@ -113,6 +147,7 @@ schedule:
     const guidePath = path.join(outputDir, "README.md");
     const antigravityBundlePath = path.join(outputDir, "bundles", "antigravity.txt");
     const cursorBundlePath = path.join(outputDir, "bundles", "cursor.txt");
+    const antigravitySpecPath = path.join(outputDir, "bundle-specs", "antigravity.yaml");
     const combinedPath = path.join(outputDir, "all-processes.txt");
     const endpointPath = path.join(outputDir, "proxy-endpoint.txt");
     const output = writeSpy.mock.calls.map((call) => String(call[0])).join("");
@@ -120,12 +155,17 @@ schedule:
     expect(existsSync(guidePath)).toBe(true);
     expect(existsSync(antigravityBundlePath)).toBe(true);
     expect(existsSync(cursorBundlePath)).toBe(true);
+    expect(existsSync(antigravitySpecPath)).toBe(true);
     expect(existsSync(combinedPath)).toBe(true);
     expect(readFileSync(guidePath, "utf8")).toContain("SOCKS5");
     expect(readFileSync(antigravityBundlePath, "utf8")).toContain("language_server_macos_arm");
+    expect(readFileSync(antigravitySpecPath, "utf8")).toContain(
+      "targetOutboundGroup: Process-Proxy",
+    );
     expect(readFileSync(cursorBundlePath, "utf8")).toContain("Cursor Helper");
     expect(readFileSync(endpointPath, "utf8")).toContain("39091");
     expect(output).toContain(`Output: ${outputDir}`);
     expect(output).toContain("Bundles: antigravity, cursor, developer-ai-cli");
+    expect(output).toContain("Bundle specs:");
   });
 });

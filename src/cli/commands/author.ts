@@ -3,7 +3,7 @@ import path from "node:path";
 import type { Command } from "commander";
 
 import { generateAuthoringPlan } from "../../modules/authoring/index.js";
-import { buildConfigArtifact } from "../../modules/build/index.js";
+import { buildConfigArtifact, resolveEffectiveIntent } from "../../modules/build/index.js";
 import {
   applyPlanToBuilderConfig,
   updateBuilderAuthoring,
@@ -37,6 +37,9 @@ export function registerAuthorCommand(program: Command): void {
     .option("--subscription-url <url>", "override subscription URL when building")
     .option("--subscription-file <path>", "use a local subscription file instead of fetching")
     .option("--preview", "print rules/config/staging diffs without writing any files")
+    .option("--diff", "print intent/rules/config diffs without writing any files")
+    .option("--emit-intent-ir", "print the generated Intent IR and exit without writing files")
+    .option("--strict", "reject ambiguous natural-language requests instead of guessing")
     .option("--skip-build", "write rules only and skip config generation")
     .option("--update", "after writing rules, run build + verify + publish")
     .option("--skip-verify", "when used with --update, skip runtime verification before publish")
@@ -75,6 +78,7 @@ export async function runAuthorFlow(options: AuthorCommandOptions): Promise<void
     ...(options.authorTimeoutMs ? { timeoutMs: Number.parseInt(options.authorTimeoutMs, 10) } : {}),
     ...(options.execCommand ? { execCommand: options.execCommand } : {}),
     ...(options.execArg.length > 0 ? { execArgs: options.execArg } : {}),
+    ...(options.strict ? { strict: true } : {}),
   });
   const plan = planResult.plan;
   const rulesPath = options.rulesOut
@@ -85,12 +89,20 @@ export async function runAuthorFlow(options: AuthorCommandOptions): Promise<void
     plan,
   });
 
-  if (options.preview) {
+  if (options.emitIntentIr) {
+    process.stdout.write(`${JSON.stringify(planResult.intent, null, 2)}\n`);
+    return;
+  }
+
+  if (options.preview || options.diff) {
+    const currentIntent = await resolveEffectiveIntent(builderConfig);
     const preview = await generateAuthoringPreview({
       configPath,
       config: builderConfig,
       plan,
       rulesPath,
+      currentIntent,
+      proposedIntent: planResult.intent,
       ...(options.subscriptionFile ? { subscriptionFile: options.subscriptionFile } : {}),
       ...(options.subscriptionUrl ? { subscriptionUrl: options.subscriptionUrl } : {}),
       buildStaging: !options.skipBuild,
@@ -103,8 +115,12 @@ export async function runAuthorFlow(options: AuthorCommandOptions): Promise<void
       `Provider used: ${planResult.providerUsed}`,
       `Templates: ${plan.templateIds.length > 0 ? plan.templateIds.join(", ") : "(none)"}`,
       `Generated rules: ${plan.beforeBuiltins.length + plan.afterBuiltins.length}`,
-      "Preview mode: no files were written.",
+      `${options.diff ? "Diff" : "Preview"} mode: no files were written.`,
     ];
+    if (planResult.ambiguities.length > 0) {
+      lines.push(`Ambiguities detected: ${planResult.ambiguities.length}`);
+      lines.push(...planResult.ambiguities.map((ambiguity) => `- ${ambiguity}`));
+    }
     if (plan.notes.length > 0) {
       lines.push(`Notes: ${plan.notes.length}`);
       lines.push(...plan.notes.map((note) => `- ${note}`));
@@ -115,6 +131,9 @@ export async function runAuthorFlow(options: AuthorCommandOptions): Promise<void
     if (options.update) {
       lines.push("Live update: requested, but skipped in preview mode.");
     }
+    lines.push("");
+    lines.push("Intent IR diff:");
+    lines.push(preview.intentDiff.diff);
     lines.push("");
     lines.push("Rules diff:");
     lines.push(preview.rulesDiff.diff);
@@ -151,6 +170,10 @@ export async function runAuthorFlow(options: AuthorCommandOptions): Promise<void
     `Templates: ${plan.templateIds.length > 0 ? plan.templateIds.join(", ") : "(none)"}`,
     `Generated rules: ${plan.beforeBuiltins.length + plan.afterBuiltins.length}`,
   ];
+  if (planResult.ambiguities.length > 0) {
+    lines.push(`Ambiguities detected: ${planResult.ambiguities.length}`);
+    lines.push(...planResult.ambiguities.map((ambiguity) => `- ${ambiguity}`));
+  }
   if (plan.notes.length > 0) {
     lines.push(`Notes: ${plan.notes.length}`);
     lines.push(...plan.notes.map((note) => `- ${note}`));
@@ -221,6 +244,9 @@ interface AuthorCommandOptions {
   readonly subscriptionUrl?: string;
   readonly subscriptionFile?: string;
   readonly preview?: boolean;
+  readonly diff?: boolean;
+  readonly emitIntentIr?: boolean;
+  readonly strict?: boolean;
   readonly skipBuild?: boolean;
   readonly update?: boolean;
   readonly skipVerify?: boolean;

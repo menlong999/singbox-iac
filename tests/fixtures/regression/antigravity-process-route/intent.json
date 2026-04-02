@@ -1,0 +1,25 @@
+{
+  "version": "v1",
+  "globals": {},
+  "sitePolicies": [],
+  "processPolicies": [
+    {
+      "name": "Antigravity bundle via Proxifier",
+      "match": {
+        "bundleId": ["com.google.antigravity"],
+        "processName": [
+          "Antigravity.app",
+          "Antigravity",
+          "language_server_macos_arm",
+          "antigravity-auto-updater"
+        ]
+      },
+      "inbound": "in-proxifier",
+      "outboundGroup": "US",
+      "verify": {
+        "expectProxyHit": true
+      }
+    }
+  ],
+  "localOverrides": {}
+}

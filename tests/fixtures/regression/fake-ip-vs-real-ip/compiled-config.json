@@ -1,0 +1,234 @@
+{
+  "log": {
+    "level": "info"
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "local",
+        "tag": "dns-local-default",
+        "prefer_go": true
+      },
+      {
+        "type": "tcp",
+        "tag": "dns-remote-primary",
+        "server": "1.1.1.1",
+        "server_port": 53
+      },
+      {
+        "type": "tcp",
+        "tag": "dns-remote-cn",
+        "server": "223.5.5.5",
+        "server_port": 53
+      }
+    ],
+    "rules": [
+      {
+        "rule_set": ["geosite-cn", "geoip-cn"],
+        "server": "dns-remote-cn"
+      },
+      {
+        "domain_suffix": ["adrop.top"],
+        "server": "dns-remote-cn"
+      }
+    ],
+    "final": "dns-local-default",
+    "strategy": "prefer_ipv4",
+    "hosts": {
+      "nas.adrop.top": "192.168.50.10"
+    }
+  },
+  "inbounds": [
+    {
+      "type": "mixed",
+      "tag": "in-mixed",
+      "listen": "127.0.0.1",
+      "listen_port": 39097
+    },
+    {
+      "type": "mixed",
+      "tag": "in-proxifier",
+      "listen": "127.0.0.1",
+      "listen_port": 39091
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "trojan",
+      "tag": "🇭🇰 香港 01",
+      "server": "hk.example.com",
+      "server_port": 443,
+      "password": "pass-hk",
+      "tls": {
+        "enabled": true,
+        "server_name": "hk.example.com",
+        "insecure": true
+      }
+    },
+    {
+      "type": "trojan",
+      "tag": "🇺🇸 美国 01",
+      "server": "us.example.com",
+      "server_port": 443,
+      "password": "pass-us",
+      "tls": {
+        "enabled": true,
+        "server_name": "us.example.com"
+      }
+    },
+    {
+      "type": "trojan",
+      "tag": "🇺🇸 美国 07 - OnlyAI",
+      "server": "us-onlyai.example.com",
+      "server_port": 9443,
+      "password": "pass-us-onlyai",
+      "tls": {
+        "enabled": true,
+        "server_name": "us-onlyai.example.com"
+      }
+    },
+    {
+      "type": "trojan",
+      "tag": "🇸🇬 新加坡 01",
+      "server": "sg.example.com",
+      "server_port": 8443,
+      "password": "pass-sg",
+      "tls": {
+        "enabled": true,
+        "server_name": "sg.example.com"
+      }
+    },
+    {
+      "type": "trojan",
+      "tag": "🇯🇵 日本 01",
+      "server": "jp.example.com",
+      "server_port": 10443,
+      "password": "pass-jp",
+      "tls": {
+        "enabled": true,
+        "server_name": "jp.example.com"
+      }
+    },
+    {
+      "type": "selector",
+      "tag": "HK",
+      "outbounds": ["🇭🇰 香港 01", "direct"],
+      "default": "🇭🇰 香港 01"
+    },
+    {
+      "type": "selector",
+      "tag": "US",
+      "outbounds": ["🇺🇸 美国 01", "🇺🇸 美国 07 - OnlyAI", "direct"],
+      "default": "🇺🇸 美国 01"
+    },
+    {
+      "type": "selector",
+      "tag": "SG",
+      "outbounds": ["🇸🇬 新加坡 01", "direct"],
+      "default": "🇸🇬 新加坡 01"
+    },
+    {
+      "type": "selector",
+      "tag": "JP",
+      "outbounds": ["🇯🇵 日本 01", "direct"],
+      "default": "🇯🇵 日本 01"
+    },
+    {
+      "type": "urltest",
+      "tag": "Global",
+      "outbounds": ["HK", "SG", "US", "JP"],
+      "interval": "10m",
+      "url": "https://www.gstatic.com/generate_204"
+    },
+    {
+      "type": "selector",
+      "tag": "Process-Proxy",
+      "outbounds": ["🇺🇸 美国 07 - OnlyAI", "US", "SG", "Global", "direct"],
+      "default": "🇺🇸 美国 07 - OnlyAI"
+    },
+    {
+      "type": "selector",
+      "tag": "AI-Out",
+      "outbounds": ["HK", "SG", "US", "JP", "Global", "direct"],
+      "default": "HK"
+    },
+    {
+      "type": "selector",
+      "tag": "Dev-Common-Out",
+      "outbounds": ["HK", "SG", "US", "JP", "Global", "direct"],
+      "default": "HK"
+    },
+    {
+      "type": "selector",
+      "tag": "Stitch-Out",
+      "outbounds": ["US", "SG", "JP", "Global", "direct"],
+      "default": "US"
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "block",
+      "tag": "block"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "action": "sniff"
+      },
+      {
+        "network": "udp",
+        "port": 443,
+        "action": "reject"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
+      {
+        "inbound": ["in-proxifier"],
+        "action": "route",
+        "outbound": "Process-Proxy"
+      },
+      {
+        "domain_suffix": ["stitch.withgoogle.com"],
+        "action": "route",
+        "outbound": "Stitch-Out"
+      },
+      {
+        "domain_suffix": ["openai.com", "chatgpt.com"],
+        "action": "route",
+        "outbound": "AI-Out"
+      },
+      {
+        "domain_suffix": ["adrop.top"],
+        "action": "route",
+        "outbound": "direct"
+      },
+      {
+        "rule_set": ["geosite-cn", "geoip-cn"],
+        "action": "route",
+        "outbound": "direct"
+      }
+    ],
+    "final": "Global",
+    "auto_detect_interface": true,
+    "default_domain_resolver": "dns-local-default",
+    "rule_set": [
+      {
+        "tag": "geosite-cn",
+        "format": "binary",
+        "type": "local",
+        "path": "<ruleset-dir>/geosite-cn.srs"
+      },
+      {
+        "tag": "geoip-cn",
+        "format": "binary",
+        "type": "local",
+        "path": "<ruleset-dir>/geoip-cn.srs"
+      }
+    ]
+  }
+}

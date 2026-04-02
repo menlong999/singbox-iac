@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import type { BuilderConfig } from "../../config/schema.js";
+import type { IntentIR } from "../../domain/intent.js";
 import { buildConfigArtifact } from "../build/index.js";
 import type { NaturalLanguagePlan } from "../natural-language/index.js";
 import {
@@ -24,12 +25,15 @@ export interface GenerateAuthoringPreviewInput {
   readonly config: BuilderConfig;
   readonly plan: NaturalLanguagePlan;
   readonly rulesPath: string;
+  readonly currentIntent: IntentIR;
+  readonly proposedIntent: IntentIR;
   readonly subscriptionFile?: string;
   readonly subscriptionUrl?: string;
   readonly buildStaging?: boolean;
 }
 
 export interface AuthoringPreviewReport {
+  readonly intentDiff: PreviewDiff;
   readonly rulesDiff: PreviewDiff;
   readonly configDiff: PreviewDiff;
   readonly stagingDiff?: PreviewDiff;
@@ -60,11 +64,17 @@ export async function generateAuthoringPreview(
     plan: input.plan,
   });
 
+  const intentDiff = await createUnifiedDiff(
+    "intent-ir",
+    JSON.stringify(input.currentIntent, null, 2),
+    JSON.stringify(input.proposedIntent, null, 2),
+  );
   const rulesDiff = await createUnifiedDiff("rules", currentRulesRaw ?? "", proposedRules);
   const configDiff = await createUnifiedDiff("builder-config", currentConfigRaw, proposedConfig);
 
   if (input.buildStaging === false) {
     return {
+      intentDiff,
       rulesDiff,
       configDiff,
     };
@@ -98,6 +108,7 @@ export async function generateAuthoringPreview(
     ]);
 
     return {
+      intentDiff,
       rulesDiff,
       configDiff,
       stagingDiff: await createUnifiedDiff(

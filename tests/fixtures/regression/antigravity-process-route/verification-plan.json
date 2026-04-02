@@ -1,0 +1,91 @@
+{
+  "dnsChecks": [
+    {
+      "domain": "antigravity.google",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-local-default"
+    },
+    {
+      "domain": "oauth2.googleapis.com",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-local-default"
+    },
+    {
+      "domain": "github.com",
+      "expectedMode": "real-ip",
+      "expectedResolver": "dns-local-default"
+    }
+  ],
+  "routeChecks": [
+    {
+      "id": "antigravity-docs",
+      "name": "Antigravity docs",
+      "target": "https://antigravity.google/docs",
+      "inbound": "in-proxifier",
+      "expectedOutboundGroup": "Process-Proxy",
+      "expectedRuleHint": "protected proxifier precedence"
+    },
+    {
+      "id": "antigravity-auth",
+      "name": "Antigravity auth",
+      "target": "https://oauth2.googleapis.com/.well-known/openid-configuration",
+      "inbound": "in-proxifier",
+      "expectedOutboundGroup": "Process-Proxy",
+      "expectedRuleHint": "protected proxifier precedence"
+    },
+    {
+      "id": "github-browser",
+      "name": "GitHub browser",
+      "target": "https://github.com/favicon.ico",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "Dev-Common-Out",
+      "expectedRuleHint": "developer/common service rule"
+    }
+  ],
+  "egressChecks": [
+    {
+      "id": "github-browser",
+      "target": "https://api.ip.sb/geoip",
+      "inbound": "in-mixed",
+      "expectedOutboundGroup": "Dev-Common-Out",
+      "expectedCountry": ["HK"]
+    }
+  ],
+  "appChecks": [
+    {
+      "id": "process-1",
+      "app": "Antigravity.app, Antigravity, language_server_macos_arm, antigravity-auto-updater",
+      "expectedInbound": "in-proxifier",
+      "expectedOutboundGroup": "US"
+    },
+    {
+      "id": "scenario-antigravity-docs",
+      "app": "Antigravity docs",
+      "expectedInbound": "in-proxifier",
+      "expectedOutboundGroup": "Process-Proxy"
+    },
+    {
+      "id": "scenario-antigravity-auth",
+      "app": "Antigravity auth",
+      "expectedInbound": "in-proxifier",
+      "expectedOutboundGroup": "Process-Proxy"
+    }
+  ],
+  "protocolChecks": [
+    {
+      "id": "protocol-antigravity-docs",
+      "target": "https://antigravity.google/docs",
+      "expectTCPOnly": true
+    },
+    {
+      "id": "protocol-antigravity-auth",
+      "target": "https://oauth2.googleapis.com/.well-known/openid-configuration",
+      "expectTCPOnly": true
+    },
+    {
+      "id": "protocol-github-browser",
+      "target": "https://github.com/favicon.ico",
+      "expectTCPOnly": true
+    }
+  ]
+}
