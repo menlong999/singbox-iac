@@ -450,7 +450,9 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
         : effectiveConfig.runtime.dependencies.chromeBinary
           ? { chromeBinary: effectiveConfig.runtime.dependencies.chromeBinary }
           : {}),
-      force: options.force === true,
+      // Onboarding should be idempotent: refresh the managed LaunchAgent instead of
+      // failing when the file already exists from a previous run.
+      force: true,
       load: options.load !== false,
     });
     schedulePath = schedule.plistPath;

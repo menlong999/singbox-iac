@@ -46,6 +46,7 @@ const authoringSchema = z
 
 const runtimeDependencySourceSchema = z.enum([
   "explicit",
+  "persisted",
   "env",
   "repo-tool",
   "path",

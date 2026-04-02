@@ -176,6 +176,60 @@ describe("setup command", () => {
     expect(existsSync(configPath)).toBe(true);
     expect(readFileSync(rulesPath, "utf8")).toContain("version: 1");
   });
+
+  it("refreshes an existing update LaunchAgent during setup instead of failing", async () => {
+    const homeDir = mkdtempSync(path.join(tmpdir(), "singbox-iac-home-existing-launchagent-"));
+    tempDirs.push(homeDir);
+    process.env.HOME = homeDir;
+
+    const fakeSingBox = path.join(homeDir, "fake-sing-box");
+    const fakeChrome = path.join(homeDir, "fake-chrome");
+    writeExecutable(fakeSingBox);
+    writeExecutable(fakeChrome);
+
+    const launchAgentsDir = path.join(homeDir, "Library", "LaunchAgents");
+    mkdirSync(launchAgentsDir, { recursive: true });
+    const plistPath = path.join(launchAgentsDir, "org.singbox-iac.update.plist");
+    writeFileSync(plistPath, "stale-launch-agent", "utf8");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | RequestInfo) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : String(input);
+        if (url === "https://example.com/subscription") {
+          return new Response(fixtureContent, { status: 200 });
+        }
+        if (url.startsWith("https://raw.githubusercontent.com/SagerNet/")) {
+          return new Response("stub-ruleset", { status: 200 });
+        }
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }),
+    );
+
+    await createProgram().parseAsync([
+      "node",
+      "singbox-iac",
+      "setup",
+      "--subscription-url",
+      "https://example.com/subscription",
+      "--prompt",
+      "国内直连，Google Stitch 走美国",
+      "--sing-box-bin",
+      fakeSingBox,
+      "--chrome-bin",
+      fakeChrome,
+      "--install-schedule",
+      "--no-load",
+    ]);
+
+    expect(readFileSync(plistPath, "utf8")).toContain("org.singbox-iac.update");
+    expect(readFileSync(plistPath, "utf8")).not.toContain("stale-launch-agent");
+  }, 10_000);
 });
 
 function writeExecutable(filePath: string): void {
