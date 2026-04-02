@@ -31,7 +31,7 @@ export interface ScheduleRemoveInput {
   readonly unload?: boolean;
 }
 
-const defaultLaunchAgentLabel = "org.singbox-iac.update";
+export const defaultLaunchAgentLabel = "org.singbox-iac.update";
 
 export async function installLaunchdSchedule(
   input: ScheduleInstallInput,

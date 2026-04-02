@@ -40,7 +40,8 @@
       "type": "mixed",
       "tag": "in-mixed",
       "listen": "127.0.0.1",
-      "listen_port": 39097
+      "listen_port": 39097,
+      "set_system_proxy": true
     },
     {
       "type": "mixed",

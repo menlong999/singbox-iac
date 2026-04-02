@@ -40,6 +40,16 @@ describe("compileConfig", () => {
           processName: "sing-box",
           signal: "HUP",
         },
+        dependencies: {},
+        desktop: {
+          profile: "system-proxy",
+          launchAgentLabel: "org.singbox-iac.runtime",
+          tun: {
+            autoRoute: true,
+            strictRoute: false,
+            addresses: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+          },
+        },
       },
       listeners: {
         mixed: {
@@ -237,6 +247,16 @@ describe("compileConfig", () => {
           processName: "sing-box",
           signal: "HUP",
         },
+        dependencies: {},
+        desktop: {
+          profile: "system-proxy",
+          launchAgentLabel: "org.singbox-iac.runtime",
+          tun: {
+            autoRoute: true,
+            strictRoute: false,
+            addresses: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+          },
+        },
       },
       listeners: {
         mixed: {
@@ -361,6 +381,16 @@ describe("compileConfig", () => {
           processName: "sing-box",
           signal: "HUP",
         },
+        dependencies: {},
+        desktop: {
+          profile: "system-proxy",
+          launchAgentLabel: "org.singbox-iac.runtime",
+          tun: {
+            autoRoute: true,
+            strictRoute: false,
+            addresses: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+          },
+        },
       },
       listeners: {
         mixed: { enabled: true, listen: "127.0.0.1", port: 39097 },
@@ -431,6 +461,135 @@ describe("compileConfig", () => {
       ),
     ).toMatchObject({
       default: "🇺🇸 美国 07 - OnlyAI",
+    });
+  });
+  it("emits desktop runtime inbounds for system-proxy and tun profiles", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "singbox-iac-desktop-runtime-"));
+    tempDirs.push(dir);
+
+    const baseConfig: BuilderConfig = {
+      version: 1,
+      subscription: {
+        url: "https://example.com/subscription",
+        format: "base64-lines",
+        protocols: ["trojan"],
+      },
+      output: {
+        stagingPath: "/tmp/staging.json",
+        livePath: "/tmp/live.json",
+        backupPath: "/tmp/backup.json",
+      },
+      runtime: {
+        checkCommand: "sing-box check -c {{stagingPath}}",
+        reload: {
+          kind: "signal",
+          processName: "sing-box",
+          signal: "HUP",
+        },
+        dependencies: {},
+        desktop: {
+          profile: "system-proxy",
+          launchAgentLabel: "org.singbox-iac.runtime",
+          tun: {
+            autoRoute: true,
+            strictRoute: false,
+            addresses: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+          },
+        },
+      },
+      listeners: {
+        mixed: { enabled: true, listen: "127.0.0.1", port: 39097 },
+        proxifier: { enabled: true, listen: "127.0.0.1", port: 39091 },
+      },
+      ruleSets: makeRuleSets(dir),
+      groups: {
+        processProxy: { type: "selector", includes: ["US"], defaultTarget: "US" },
+        aiOut: { type: "selector", includes: ["HK", "US"], defaultTarget: "HK" },
+        devCommonOut: { type: "selector", includes: ["HK", "US"], defaultTarget: "HK" },
+        stitchOut: { type: "selector", includes: ["US"], defaultTarget: "US" },
+        global: { type: "urltest", includes: ["HK", "US"] },
+      },
+      rules: {
+        userRulesFile: "/tmp/custom.rules.yaml",
+      },
+      verification: {
+        scenarios: [],
+      },
+      schedule: {
+        enabled: false,
+        intervalMinutes: 30,
+      },
+      authoring: {
+        provider: "deterministic",
+        timeoutMs: 4000,
+      },
+    };
+
+    const systemProxyArtifact = compileConfig({
+      config: baseConfig,
+      intent: createEmptyIntent(),
+      nodes: [
+        {
+          protocol: "trojan",
+          tag: "🇭🇰 香港 01",
+          server: "hk.example.com",
+          serverPort: 443,
+          password: "pass-1",
+          sni: "hk.example.com",
+          regionHint: "HK",
+        },
+      ],
+    });
+    expect(
+      (systemProxyArtifact.config.inbounds as Array<Record<string, unknown>>).find(
+        (inbound) => inbound.tag === "in-mixed",
+      ),
+    ).toMatchObject({
+      tag: "in-mixed",
+      set_system_proxy: true,
+    });
+
+    const tunArtifact = compileConfig({
+      config: {
+        ...baseConfig,
+        runtime: {
+          ...baseConfig.runtime,
+          desktop: {
+            ...baseConfig.runtime.desktop,
+            profile: "tun",
+            tun: {
+              autoRoute: true,
+              strictRoute: true,
+              interfaceName: "utun9",
+              addresses: ["172.20.0.1/30"],
+            },
+          },
+        },
+      },
+      intent: createEmptyIntent(),
+      nodes: [
+        {
+          protocol: "trojan",
+          tag: "🇭🇰 香港 01",
+          server: "hk.example.com",
+          serverPort: 443,
+          password: "pass-1",
+          sni: "hk.example.com",
+          regionHint: "HK",
+        },
+      ],
+    });
+    expect(
+      (tunArtifact.config.inbounds as Array<Record<string, unknown>>).find(
+        (inbound) => inbound.tag === "in-tun",
+      ),
+    ).toMatchObject({
+      tag: "in-tun",
+      type: "tun",
+      interface_name: "utun9",
+      auto_route: true,
+      strict_route: true,
+      address: ["172.20.0.1/30"],
     });
   });
 });

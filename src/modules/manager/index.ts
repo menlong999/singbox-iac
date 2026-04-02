@@ -4,6 +4,7 @@ import { access, copyFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 
 import type { BuilderConfig } from "../../config/schema.js";
+import { resolveSingBoxDependency } from "../runtime-dependencies/index.js";
 
 export interface CheckConfigInput {
   readonly configPath: string;
@@ -102,25 +103,15 @@ export async function shouldAutoReloadRuntime(
   return isProcessRunning(runtime.processName);
 }
 
-export async function resolveSingBoxBinary(explicitPath?: string): Promise<string> {
-  const candidates = [
+export async function resolveSingBoxBinary(
+  explicitPath?: string,
+  persistedPath?: string,
+): Promise<string> {
+  const resolved = await resolveSingBoxDependency({
     explicitPath,
-    process.env.SING_BOX_BIN,
-    path.resolve(process.cwd(), ".tools", "sing-box-1.13.4-darwin-arm64", "sing-box"),
-    ...resolvePathCandidates("sing-box"),
-  ].filter(
-    (candidate): candidate is string => typeof candidate === "string" && candidate.length > 0,
-  );
-
-  for (const candidate of candidates) {
-    if (await isExecutable(candidate)) {
-      return candidate;
-    }
-  }
-
-  throw new Error(
-    "Unable to find a usable sing-box binary. Set SING_BOX_BIN or install sing-box on PATH.",
-  );
+    persistedPath,
+  });
+  return resolved.path;
 }
 
 interface ReloadInput {
@@ -147,15 +138,6 @@ async function reloadSingBox(input: ReloadInput): Promise<void> {
   await runCommand("/usr/bin/killall", [`-${input.signal}`, input.processName]);
 }
 
-async function isExecutable(filePath: string): Promise<boolean> {
-  try {
-    await access(filePath, constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function pathExists(filePath: string): Promise<boolean> {
   try {
     await access(filePath, constants.F_OK);
@@ -163,14 +145,6 @@ async function pathExists(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function resolvePathCandidates(commandName: string): string[] {
-  return (process.env.PATH ?? "")
-    .split(path.delimiter)
-    .filter((entry) => entry.length > 0)
-    .map((entry) => path.join(entry, commandName))
-    .filter((candidate, index, items) => items.indexOf(candidate) === index);
 }
 
 async function runCommand(command: string, args: readonly string[]): Promise<void> {

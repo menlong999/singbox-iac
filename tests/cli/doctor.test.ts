@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -111,6 +111,9 @@ schedule:
     expect(output).toContain("[PASS] sing-box:");
     expect(output).toContain("[PASS] chrome:");
     expect(output).toContain("[PASS] builder-config:");
+    const renderedConfig = readFileSync(configPath, "utf8");
+    expect(renderedConfig).toContain(`singBoxBinary: ${fakeSingBox}`);
+    expect(renderedConfig).toContain(`chromeBinary: ${fakeChrome}`);
   });
 });
 

@@ -1,4 +1,5 @@
 export type RuntimeMode = "browser-proxy" | "process-proxy" | "headless-daemon";
+export type DesktopRuntimeProfileKind = "none" | "system-proxy" | "tun";
 
 export interface RuntimeModeDefaults {
   readonly preferredListeners: readonly ("mixed" | "proxifier")[];
@@ -6,4 +7,5 @@ export interface RuntimeModeDefaults {
   readonly openVisibleBrowserByDefault: boolean;
   readonly visibleBrowserScenarioLimit: number;
   readonly scheduleRecommended: boolean;
+  readonly desktopProfile: DesktopRuntimeProfileKind;
 }

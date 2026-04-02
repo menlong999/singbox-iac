@@ -3,6 +3,7 @@ import path from "node:path";
 import type { Command } from "commander";
 
 import { runDoctor } from "../../modules/doctor/index.js";
+import { persistRuntimeDependencies } from "../../modules/runtime-dependencies/index.js";
 import { findDefaultConfigPath, resolveBuilderConfig } from "../command-helpers.js";
 
 export function registerDoctorCommand(program: Command): void {
@@ -28,6 +29,18 @@ export function registerDoctorCommand(program: Command): void {
           ? { launchAgentsDir: pathResolve(options.launchAgentsDir) }
           : {}),
       });
+
+      if (config && configPath) {
+        await persistRuntimeDependencies({
+          configPath,
+          ...(report.resolvedDependencies.singBox
+            ? { singBox: report.resolvedDependencies.singBox }
+            : {}),
+          ...(report.resolvedDependencies.chrome
+            ? { chrome: report.resolvedDependencies.chrome }
+            : {}),
+        });
+      }
 
       process.stdout.write(
         `${report.checks.map((check) => `[${check.status}] ${check.name}: ${check.details}`).join("\n")}\n`,

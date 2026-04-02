@@ -33,6 +33,8 @@ export interface UpdateResult {
 }
 
 export async function runUpdate(input: RunUpdateInput): Promise<UpdateResult> {
+  const singBoxBinary = input.singBoxBinary ?? input.config.runtime.dependencies.singBoxBinary;
+  const chromeBinary = input.chromeBinary ?? input.config.runtime.dependencies.chromeBinary;
   const build = await buildConfigArtifact({
     config: input.config,
     ...(input.outputPath ? { outputPath: input.outputPath } : {}),
@@ -44,8 +46,8 @@ export async function runUpdate(input: RunUpdateInput): Promise<UpdateResult> {
   if (input.verify !== false) {
     verification = await verifyConfigRoutes({
       configPath: build.outputPath,
-      ...(input.singBoxBinary ? { singBoxBinary: input.singBoxBinary } : {}),
-      ...(input.chromeBinary ? { chromeBinary: input.chromeBinary } : {}),
+      ...(singBoxBinary ? { singBoxBinary } : {}),
+      ...(chromeBinary ? { chromeBinary } : {}),
       configuredScenarios: input.config.verification.scenarios,
     });
     assertVerificationReportPassed(verification);
@@ -71,7 +73,7 @@ export async function runUpdate(input: RunUpdateInput): Promise<UpdateResult> {
         stagingPath: build.outputPath,
         livePath,
         ...(backupPath ? { backupPath } : {}),
-        ...(input.singBoxBinary ? { singBoxBinary: input.singBoxBinary } : {}),
+        ...(singBoxBinary ? { singBoxBinary } : {}),
         reload: reloaded,
         runtime: input.config.runtime.reload,
       });

@@ -57,6 +57,9 @@ runtime:
     kind: "signal"
     processName: "sing-box"
     signal: "HUP"
+  dependencies:
+    singBoxBinary: "${binaryPath}"
+    singBoxSource: "explicit"
 listeners:
   mixed:
     enabled: true
@@ -112,8 +115,6 @@ schedule:
       "--subscription-file",
       fixturePath,
       "--skip-verify",
-      "--sing-box-bin",
-      binaryPath,
     ]);
 
     expect(readFileSync(livePath, "utf8")).toContain('"type": "trojan"');

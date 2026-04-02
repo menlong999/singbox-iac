@@ -1,6 +1,10 @@
 import type { BuilderConfig } from "../../config/schema.js";
 import type { IntentIR } from "../../domain/intent.js";
-import type { RuntimeMode, RuntimeModeDefaults } from "../../domain/runtime-mode.js";
+import type {
+  DesktopRuntimeProfileKind,
+  RuntimeMode,
+  RuntimeModeDefaults,
+} from "../../domain/runtime-mode.js";
 
 interface RuntimeModeInferenceInput {
   readonly phase: "onboarding" | "update";
@@ -23,6 +27,8 @@ const processKeywords = [
   "独立入口",
   "独立的入口",
 ];
+
+const tunKeywords = ["tun", "全局代理", "全局模式", "系统全局", "utun", "全局接管"];
 
 export function inferRuntimeMode(input: RuntimeModeInferenceInput): RuntimeMode {
   if (input.phase === "update") {
@@ -57,6 +63,7 @@ export function getRuntimeModeDefaults(mode: RuntimeMode): RuntimeModeDefaults {
         openVisibleBrowserByDefault: true,
         visibleBrowserScenarioLimit: 4,
         scheduleRecommended: true,
+        desktopProfile: "system-proxy",
       };
 
     case "headless-daemon":
@@ -66,6 +73,7 @@ export function getRuntimeModeDefaults(mode: RuntimeMode): RuntimeModeDefaults {
         openVisibleBrowserByDefault: false,
         visibleBrowserScenarioLimit: 0,
         scheduleRecommended: true,
+        desktopProfile: "none",
       };
 
     default:
@@ -75,8 +83,26 @@ export function getRuntimeModeDefaults(mode: RuntimeMode): RuntimeModeDefaults {
         openVisibleBrowserByDefault: true,
         visibleBrowserScenarioLimit: 3,
         scheduleRecommended: false,
+        desktopProfile: "system-proxy",
       };
   }
+}
+
+export function inferDesktopRuntimeProfile(input: {
+  readonly mode: RuntimeMode;
+  readonly prompt?: string;
+  readonly config?: BuilderConfig;
+}): DesktopRuntimeProfileKind {
+  const prompt = input.prompt?.toLowerCase() ?? "";
+  if (tunKeywords.some((keyword) => prompt.includes(keyword))) {
+    return "tun";
+  }
+
+  if (input.config?.runtime.desktop.profile) {
+    return input.config.runtime.desktop.profile;
+  }
+
+  return getRuntimeModeDefaults(input.mode).desktopProfile;
 }
 
 export function selectVerificationScenariosForRuntimeMode<T extends RuntimeModeScenario>(

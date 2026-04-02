@@ -44,6 +44,58 @@ const authoringSchema = z
     timeoutMs: 4000,
   });
 
+const runtimeDependencySourceSchema = z.enum([
+  "explicit",
+  "env",
+  "repo-tool",
+  "path",
+  "app-bundle",
+]);
+
+const runtimeDependenciesSchema = z
+  .object({
+    singBoxBinary: z.string().min(1).optional(),
+    singBoxSource: runtimeDependencySourceSchema.optional(),
+    chromeBinary: z.string().min(1).optional(),
+    chromeSource: runtimeDependencySourceSchema.optional(),
+    resolvedAt: z.string().min(1).optional(),
+  })
+  .default({});
+
+const desktopRuntimeProfileSchema = z.enum(["none", "system-proxy", "tun"]);
+
+const desktopTunRuntimeSchema = z
+  .object({
+    autoRoute: z.boolean().default(true),
+    strictRoute: z.boolean().default(false),
+    interfaceName: z.string().min(1).optional(),
+    addresses: z
+      .array(z.string().min(1))
+      .min(1)
+      .default(["172.19.0.1/30", "fdfe:dcba:9876::1/126"]),
+  })
+  .default({
+    autoRoute: true,
+    strictRoute: false,
+    addresses: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+  });
+
+const desktopRuntimeSchema = z
+  .object({
+    profile: desktopRuntimeProfileSchema.default("system-proxy"),
+    launchAgentLabel: z.string().min(1).default("org.singbox-iac.runtime"),
+    tun: desktopTunRuntimeSchema,
+  })
+  .default({
+    profile: "system-proxy",
+    launchAgentLabel: "org.singbox-iac.runtime",
+    tun: {
+      autoRoute: true,
+      strictRoute: false,
+      addresses: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+    },
+  });
+
 export const builderConfigSchema = z.object({
   version: z.literal(1),
   subscription: z.object({
@@ -64,6 +116,8 @@ export const builderConfigSchema = z.object({
       signal: z.string().min(1).optional(),
       command: z.string().min(1).optional(),
     }),
+    dependencies: runtimeDependenciesSchema,
+    desktop: desktopRuntimeSchema,
   }),
   listeners: z.object({
     mixed: listenerSchema,

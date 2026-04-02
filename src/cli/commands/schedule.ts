@@ -48,8 +48,16 @@ export function registerScheduleCommand(program: Command): void {
           : {}),
         ...(options.logsDir ? { logsDir: resolvePath(options.logsDir) } : {}),
         ...(options.cwd ? { workingDirectory: resolvePath(options.cwd) } : {}),
-        ...(options.singBoxBin ? { singBoxBinary: resolvePath(options.singBoxBin) } : {}),
-        ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
+        ...(options.singBoxBin
+          ? { singBoxBinary: resolvePath(options.singBoxBin) }
+          : builderConfig.runtime.dependencies.singBoxBinary
+            ? { singBoxBinary: builderConfig.runtime.dependencies.singBoxBinary }
+            : {}),
+        ...(options.chromeBin
+          ? { chromeBinary: resolvePath(options.chromeBin) }
+          : builderConfig.runtime.dependencies.chromeBinary
+            ? { chromeBinary: builderConfig.runtime.dependencies.chromeBinary }
+            : {}),
         force: options.force === true,
         load: options.load !== false,
       });

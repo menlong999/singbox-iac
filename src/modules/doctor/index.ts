@@ -5,8 +5,11 @@ import path from "node:path";
 
 import type { BuilderConfig } from "../../config/schema.js";
 import { detectLocalAiClis } from "../authoring/index.js";
-import { resolveSingBoxBinary } from "../manager/index.js";
-import { resolveChromeBinary } from "../verification/index.js";
+import {
+  type ResolvedRuntimeDependency,
+  resolveChromeDependency,
+  resolveSingBoxDependency,
+} from "../runtime-dependencies/index.js";
 
 export interface DoctorInput {
   readonly config?: BuilderConfig;
@@ -24,10 +27,16 @@ export interface DoctorCheck {
 
 export interface DoctorReport {
   readonly checks: readonly DoctorCheck[];
+  readonly resolvedDependencies: {
+    readonly singBox?: ResolvedRuntimeDependency;
+    readonly chrome?: ResolvedRuntimeDependency;
+  };
 }
 
 export async function runDoctor(input: DoctorInput): Promise<DoctorReport> {
   const checks: DoctorCheck[] = [];
+  let resolvedSingBox: ResolvedRuntimeDependency | undefined;
+  let resolvedChrome: ResolvedRuntimeDependency | undefined;
 
   checks.push(makeCheck(platform() === "darwin" ? "PASS" : "WARN", "os", `platform=${platform()}`));
 
@@ -43,10 +52,35 @@ export async function runDoctor(input: DoctorInput): Promise<DoctorReport> {
     );
   }
 
-  checks.push(
-    await checkBinary("sing-box", () => resolveSingBoxBinary(input.singBoxBinary), "FAIL"),
-  );
-  checks.push(await checkBinary("chrome", () => resolveChromeBinary(input.chromeBinary), "WARN"));
+  {
+    const result = await checkBinary(
+      "sing-box",
+      () =>
+        resolveSingBoxDependency({
+          explicitPath: input.singBoxBinary,
+          persistedPath: input.config?.runtime.dependencies.singBoxBinary,
+        }),
+      "FAIL",
+      input.config?.runtime.dependencies.singBoxBinary,
+    );
+    checks.push(result.check);
+    resolvedSingBox = result.resolved;
+  }
+
+  {
+    const result = await checkBinary(
+      "chrome",
+      () =>
+        resolveChromeDependency({
+          explicitPath: input.chromeBinary,
+          persistedPath: input.config?.runtime.dependencies.chromeBinary,
+        }),
+      "WARN",
+      input.config?.runtime.dependencies.chromeBinary,
+    );
+    checks.push(result.check);
+    resolvedChrome = result.resolved;
+  }
 
   const localAiClis = await detectLocalAiClis();
   const installedAiClis = localAiClis.filter((cli) => cli.installed);
@@ -124,19 +158,36 @@ export async function runDoctor(input: DoctorInput): Promise<DoctorReport> {
     checks.push(makeCheck(authoringStatus, "authoring-provider", authoringDetails));
   }
 
-  return { checks };
+  return {
+    checks,
+    resolvedDependencies: {
+      ...(resolvedSingBox ? { singBox: resolvedSingBox } : {}),
+      ...(resolvedChrome ? { chrome: resolvedChrome } : {}),
+    },
+  };
 }
 
 async function checkBinary(
   name: string,
-  resolver: () => Promise<string>,
+  resolver: () => Promise<ResolvedRuntimeDependency>,
   failureStatus: "WARN" | "FAIL",
-): Promise<DoctorCheck> {
+  persistedPath?: string,
+): Promise<{ check: DoctorCheck; resolved?: ResolvedRuntimeDependency }> {
   try {
     const resolved = await resolver();
-    return makeCheck("PASS", name, resolved);
+    const status =
+      persistedPath && resolved.source !== "persisted" && resolved.source !== "explicit"
+        ? "WARN"
+        : "PASS";
+    const details =
+      persistedPath && resolved.source !== "persisted" && resolved.source !== "explicit"
+        ? `${resolved.path} (source=${resolved.source}, persisted path unavailable: ${persistedPath})`
+        : `${resolved.path} (source=${resolved.source})`;
+    return { check: makeCheck(status, name, details), resolved };
   } catch (error) {
-    return makeCheck(failureStatus, name, error instanceof Error ? error.message : String(error));
+    return {
+      check: makeCheck(failureStatus, name, error instanceof Error ? error.message : String(error)),
+    };
   }
 }
 

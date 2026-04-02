@@ -157,6 +157,8 @@ npm install -g @singbox-iac/cli
 singbox-iac --help
 ```
 
+第一次成功执行 `go`、`setup` 或 `doctor` 之后，CLI 会把解析到的 `sing-box` 和 Chrome 路径写回你的 `builder.config.yaml`。这样后续 `update` 和 `launchd schedule` 不会再依赖你当前 shell 的 `PATH`。
+
 ## 快速开始
 
 ### 大多数用户只需要 3 个命令
@@ -170,6 +172,28 @@ singbox-iac update
 - `go`：第一次安装时使用，一条命令完成初始化、验证、发布和定时任务准备
 - `use`：以后需求变化时使用，一句话改策略并重新应用
 - `update`：日常更新订阅并自动在运行中的 `sing-box` 上生效
+
+桌面运行和排障最常用的是：
+
+```bash
+singbox-iac start
+singbox-iac stop
+singbox-iac restart
+singbox-iac status
+```
+
+- `start`：以 macOS 专用 LaunchAgent 启动桌面运行时
+- `stop`：停止桌面运行时，并让 `sing-box` 释放系统代理或 TUN 资源
+- `restart`：重新拉起桌面运行时
+- `status`：汇总 live config、桌面运行时、系统代理 / TUN 状态、schedule 和最近一次事务
+
+排障时优先用：
+
+```bash
+singbox-iac status
+```
+
+它会汇总当前 `sing-box` binary、live config、进程状态、监听端口、schedule 状态和最近一次发布事务。
 
 其余命令都可以理解为高级命令，主要用于调试、排障或更细粒度控制。
 
@@ -216,6 +240,19 @@ singbox-iac setup \
 singbox-iac run
 ```
 
+如果你想要更接近 GUI 的常驻体验，优先用：
+
+```bash
+singbox-iac start
+```
+
+当前默认桌面运行 profile 是：
+
+- `system-proxy`：保留 `mixed` 入站，并让 `sing-box` 自动设置 / 清理 macOS 系统代理
+- `tun`：生成 `tun` 入站并启用 `auto_route`，更接近 GUI 客户端的全局接管方式
+
+如果自然语言里明确提到 `TUN`、`全局代理`、`全局模式` 等需求，onboarding 会把桌面 profile 推断成 `tun`。否则默认使用 `system-proxy`。
+
 默认监听端口：
 
 - `127.0.0.1:39097`：浏览器 / 系统代理流量
@@ -240,6 +277,11 @@ singbox-iac update
 ```bash
 singbox-iac schedule install
 ```
+
+定时更新和桌面运行是两条独立链路：
+
+- `schedule install`：定时执行 `update`
+- `start / stop / restart`：管理本地桌面运行的 `sing-box` LaunchAgent
 
 ## 自然语言规则编写
 

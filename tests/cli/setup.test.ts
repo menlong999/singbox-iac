@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -31,6 +31,10 @@ describe("setup command", () => {
     process.env.HOME = homeDir;
 
     const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const fakeSingBox = path.join(homeDir, "fake-sing-box");
+    const fakeChrome = path.join(homeDir, "fake-chrome");
+    writeExecutable(fakeSingBox);
+    writeExecutable(fakeChrome);
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string | URL | RequestInfo) => {
@@ -58,6 +62,10 @@ describe("setup command", () => {
       "https://example.com/subscription",
       "--prompt",
       "GitHub 走香港，Gemini 走新加坡，Antigravity 进程级走美国，每45分钟自动更新",
+      "--sing-box-bin",
+      fakeSingBox,
+      "--chrome-bin",
+      fakeChrome,
     ]);
 
     const configPath = path.join(homeDir, ".config", "singbox-iac", "builder.config.yaml");
@@ -96,6 +104,8 @@ describe("setup command", () => {
     expect(existsSync(proxifierBundlePath)).toBe(true);
     expect(readFileSync(configPath, "utf8")).toContain("https://example.com/subscription");
     expect(readFileSync(configPath, "utf8")).toContain("intervalMinutes: 45");
+    expect(readFileSync(configPath, "utf8")).toContain(`singBoxBinary: ${fakeSingBox}`);
+    expect(readFileSync(configPath, "utf8")).toContain(`chromeBinary: ${fakeChrome}`);
     expect(readFileSync(rulesPath, "utf8")).toContain("github.com");
     expect(readFileSync(proxifierGuidePath, "utf8")).toContain("Proxifier Onboarding");
     expect(readFileSync(proxifierBundlePath, "utf8")).toContain("language_server_macos_arm");
@@ -107,3 +117,8 @@ describe("setup command", () => {
     expect(writeSpy).toHaveBeenCalled();
   });
 });
+
+function writeExecutable(filePath: string): void {
+  writeFileSync(filePath, "#!/bin/sh\nexit 0\n");
+  chmodSync(filePath, 0o755);
+}

@@ -10,6 +10,7 @@ import type { BuilderConfig } from "../../config/schema.js";
 import type { DNSPlan } from "../../domain/dns-plan.js";
 import type { VerificationPlan } from "../../domain/verification-plan.js";
 import { checkConfig, resolveSingBoxBinary } from "../manager/index.js";
+import { resolveChromeDependency } from "../runtime-dependencies/index.js";
 
 type JsonObject = Record<string, unknown>;
 
@@ -514,25 +515,15 @@ export function isRouteLevelProxySuccess(
   );
 }
 
-export async function resolveChromeBinary(explicitPath?: string): Promise<string> {
-  const candidates = [
+export async function resolveChromeBinary(
+  explicitPath?: string,
+  persistedPath?: string,
+): Promise<string> {
+  const resolved = await resolveChromeDependency({
     explicitPath,
-    process.env.CHROME_BIN,
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
-  ].filter(
-    (candidate): candidate is string => typeof candidate === "string" && candidate.length > 0,
-  );
-
-  for (const candidate of candidates) {
-    if (await isExecutable(candidate)) {
-      return candidate;
-    }
-  }
-
-  throw new Error(
-    "Unable to find a usable Chrome binary. Set CHROME_BIN or install Google Chrome.",
-  );
+    persistedPath,
+  });
+  return resolved.path;
 }
 
 export async function openVisibleChromeWindows(input: {

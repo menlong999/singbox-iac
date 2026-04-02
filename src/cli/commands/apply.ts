@@ -38,7 +38,11 @@ export function registerApplyCommand(program: Command): void {
                 stagingPath,
                 livePath,
                 ...(backupPath ? { backupPath } : {}),
-                ...(options.singBoxBin ? { singBoxBinary: options.singBoxBin } : {}),
+                ...(options.singBoxBin
+                  ? { singBoxBinary: options.singBoxBin }
+                  : builderConfig.runtime.dependencies.singBoxBinary
+                    ? { singBoxBinary: builderConfig.runtime.dependencies.singBoxBinary }
+                    : {}),
                 ...(options.reload !== undefined ? { reload: options.reload } : {}),
                 ...(builderConfig?.runtime.reload ? { runtime: builderConfig.runtime.reload } : {}),
               });

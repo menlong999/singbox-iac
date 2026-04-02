@@ -19,7 +19,11 @@ export function registerCheckCommand(program: Command): void {
 
       const result = await checkConfig({
         configPath,
-        ...(options.singBoxBin ? { singBoxBinary: options.singBoxBin } : {}),
+        ...(options.singBoxBin
+          ? { singBoxBinary: options.singBoxBin }
+          : builderConfig?.runtime.dependencies.singBoxBinary
+            ? { singBoxBinary: builderConfig.runtime.dependencies.singBoxBinary }
+            : {}),
       });
 
       process.stdout.write(`OK: ${configPath}\nBinary: ${result.binaryPath}\n`);

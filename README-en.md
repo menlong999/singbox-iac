@@ -157,6 +157,8 @@ npm install -g @singbox-iac/cli
 singbox-iac --help
 ```
 
+After the first successful `go`, `setup`, or `doctor` run, the CLI persists the resolved `sing-box` and Chrome paths into your `builder.config.yaml`. Later `update` runs and the `launchd` schedule no longer depend on your current shell `PATH`.
+
 ## Quick Start
 
 ### Most users only need 3 commands
@@ -170,6 +172,29 @@ singbox-iac update
 - `go`: first-time onboarding in one command
 - `use`: change policy later with one sentence and re-apply it
 - `update`: refresh the subscription and apply the latest config
+
+For desktop runtime and troubleshooting, the most useful commands are:
+
+```bash
+singbox-iac start
+singbox-iac stop
+singbox-iac restart
+singbox-iac status
+```
+
+- `start`: start the desktop runtime as a dedicated macOS LaunchAgent
+- `stop`: stop the desktop runtime and let `sing-box` release system proxy or TUN resources
+- `restart`: restart the desktop runtime
+- `status`: summarize live config, desktop runtime, system proxy/TUN state, schedule, and the latest transaction
+
+For troubleshooting, start with:
+
+```bash
+singbox-iac status
+```
+
+It summarizes the current `sing-box` binary, live config, process state, listener activity,
+schedule state, and the latest publish transaction.
 
 Everything else can be treated as advanced commands for debugging or fine-grained control.
 
@@ -216,6 +241,19 @@ The difference is simple:
 singbox-iac run
 ```
 
+If you want a more GUI-like always-on desktop runtime, prefer:
+
+```bash
+singbox-iac start
+```
+
+The default desktop runtime profiles are:
+
+- `system-proxy`: keep the `mixed` inbound and let `sing-box` set / clean macOS system proxy automatically
+- `tun`: emit a `tun` inbound with `auto_route`, closer to the global-capture behavior of GUI clients
+
+If onboarding intent explicitly mentions `TUN`, `global proxy`, or similar wording, the desktop profile is inferred as `tun`. Otherwise the default profile is `system-proxy`.
+
 Default local listeners:
 
 - `127.0.0.1:39097` for browser/system proxy traffic
@@ -240,6 +278,11 @@ That command performs:
 ```bash
 singbox-iac schedule install
 ```
+
+Background updates and desktop runtime are separate concerns:
+
+- `schedule install`: runs recurring `update`
+- `start / stop / restart`: manage the local desktop runtime LaunchAgent
 
 ## Natural-Language Authoring
 

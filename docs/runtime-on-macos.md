@@ -7,6 +7,7 @@ The target runtime is a headless macOS deployment:
 - `sing-box` installed separately
 - this CLI generates and validates config
 - `launchd` handles periodic updates
+- a dedicated runtime LaunchAgent can keep `sing-box` running in desktop mode
 
 ## Planned Flow
 
@@ -22,6 +23,9 @@ The target runtime is a headless macOS deployment:
 singbox-iac go '<url>' '<一句话策略>'
 singbox-iac use '<新的需求描述>'
 singbox-iac update
+singbox-iac start
+singbox-iac stop
+singbox-iac status
 ```
 
 Advanced commands remain available for debugging or fine-grained control:
@@ -33,13 +37,45 @@ singbox-iac author
 singbox-iac build
 singbox-iac verify
 singbox-iac schedule install
+singbox-iac restart
 ```
+
+## Desktop Runtime Profiles
+
+The builder config now persists an internal desktop runtime profile:
+
+- `system-proxy`
+  - `in-mixed` is still used
+  - `set_system_proxy: true` is emitted so `sing-box` can set and clean the macOS system proxy
+- `tun`
+  - a `tun` inbound is emitted
+  - `auto_route` is enabled
+  - this is closer to the "global capture" experience of GUI clients
+
+During onboarding, prompts that mention `TUN`, `全局代理`, or `全局模式` are inferred as `tun`; otherwise the default is `system-proxy`.
+
+## Runtime Control
+
+Use the dedicated runtime commands for GUI-like everyday control:
+
+```bash
+singbox-iac start
+singbox-iac stop
+singbox-iac restart
+singbox-iac status
+```
+
+- `start` writes or refreshes a dedicated runtime LaunchAgent and boots it
+- `stop` unloads and removes that runtime LaunchAgent
+- `restart` replaces the runtime LaunchAgent
+- `status` reports `sing-box` binary resolution, live config presence, desktop runtime state, system proxy/TUN hints, scheduler state, and recent transactions
 
 ## Launchd Notes
 
 - In source-tree development, `schedule install` emits a LaunchAgent that runs `node_modules/.bin/tsx src/cli/index.ts update --config <path>`.
 - In built distributions, the same logic emits a LaunchAgent that runs the compiled CLI entrypoint with `node`.
 - Use `--no-load` during testing to validate the generated plist without calling `launchctl bootstrap`.
+- Desktop runtime uses a separate LaunchAgent label from the update scheduler.
 
 ## Why `launchd`
 

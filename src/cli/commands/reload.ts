@@ -16,7 +16,11 @@ export function registerReloadCommand(program: Command): void {
       }
 
       await reloadRuntime({
-        ...(options.singBoxBin ? { singBoxBinary: options.singBoxBin } : {}),
+        ...(options.singBoxBin
+          ? { singBoxBinary: options.singBoxBin }
+          : builderConfig.runtime.dependencies.singBoxBinary
+            ? { singBoxBinary: builderConfig.runtime.dependencies.singBoxBinary }
+            : {}),
         runtime: builderConfig.runtime.reload,
       });
 

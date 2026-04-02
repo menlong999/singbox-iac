@@ -5,6 +5,7 @@ import type { Command } from "commander";
 
 import type { BuilderConfig } from "../../config/schema.js";
 import { buildConfigArtifact } from "../../modules/build/index.js";
+import { defaultRuntimeLaunchAgentLabel } from "../../modules/desktop-runtime/index.js";
 import { resolveBuilderConfig } from "../command-helpers.js";
 
 export function registerBuildCommand(program: Command): void {
@@ -70,6 +71,16 @@ async function resolveBuildConfig(options: BuildCommandOptions): Promise<Builder
         kind: "signal",
         processName: "sing-box",
         signal: "HUP",
+      },
+      dependencies: {},
+      desktop: {
+        profile: "system-proxy",
+        launchAgentLabel: defaultRuntimeLaunchAgentLabel,
+        tun: {
+          autoRoute: true,
+          strictRoute: false,
+          addresses: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+        },
       },
     },
     listeners: {

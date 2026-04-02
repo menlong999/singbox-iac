@@ -203,25 +203,47 @@ export function compileConfig(input: CompileConfigInput): BuildArtifact {
   const config: Record<string, unknown> = {
     log: { level: "info" },
     dns: compileDnsPlan(dnsPlan),
-    inbounds: [
-      {
-        type: "mixed",
-        tag: "in-mixed",
-        listen: input.config.listeners.mixed.listen,
-        listen_port: input.config.listeners.mixed.port,
-      },
-      {
-        type: "mixed",
-        tag: "in-proxifier",
-        listen: input.config.listeners.proxifier.listen,
-        listen_port: input.config.listeners.proxifier.port,
-      },
-    ],
+    inbounds: buildInbounds(input.config),
     outbounds,
     route,
   };
 
   return { config, warnings };
+}
+
+function buildInbounds(config: BuilderConfig): readonly Record<string, unknown>[] {
+  const inbounds: Array<Record<string, unknown>> = [];
+  const desktopProfile = config.runtime.desktop.profile;
+
+  if (desktopProfile === "tun") {
+    inbounds.push({
+      type: "tun",
+      tag: "in-tun",
+      ...(config.runtime.desktop.tun.interfaceName
+        ? { interface_name: config.runtime.desktop.tun.interfaceName }
+        : {}),
+      address: [...config.runtime.desktop.tun.addresses],
+      auto_route: config.runtime.desktop.tun.autoRoute,
+      strict_route: config.runtime.desktop.tun.strictRoute,
+      stack: "system",
+    });
+  }
+
+  inbounds.push({
+    type: "mixed",
+    tag: "in-mixed",
+    listen: config.listeners.mixed.listen,
+    listen_port: config.listeners.mixed.port,
+    ...(desktopProfile === "system-proxy" ? { set_system_proxy: true } : {}),
+  });
+  inbounds.push({
+    type: "mixed",
+    tag: "in-proxifier",
+    listen: config.listeners.proxifier.listen,
+    listen_port: config.listeners.proxifier.port,
+  });
+
+  return inbounds;
 }
 
 function compileIntentSitePolicies(

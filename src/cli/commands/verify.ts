@@ -73,8 +73,16 @@ export function registerVerifyCommand(program: Command): void {
       if (mode === "all" || mode === "route") {
         const report = await verifyConfigRoutes({
           configPath,
-          ...(options.singBoxBin ? { singBoxBinary: options.singBoxBin } : {}),
-          ...(options.chromeBin ? { chromeBinary: options.chromeBin } : {}),
+          ...(options.singBoxBin
+            ? { singBoxBinary: options.singBoxBin }
+            : builderConfig.runtime.dependencies.singBoxBinary
+              ? { singBoxBinary: builderConfig.runtime.dependencies.singBoxBinary }
+              : {}),
+          ...(options.chromeBin
+            ? { chromeBinary: options.chromeBin }
+            : builderConfig.runtime.dependencies.chromeBinary
+              ? { chromeBinary: builderConfig.runtime.dependencies.chromeBinary }
+              : {}),
           configuredScenarios: builderConfig.verification.scenarios,
         });
         lines.push("");
@@ -115,7 +123,11 @@ export function registerVerifyCommand(program: Command): void {
         const egressResults = await verifyEgressPlan({
           configPath,
           checks: verificationPlan.egressChecks,
-          ...(options.singBoxBin ? { singBoxBinary: options.singBoxBin } : {}),
+          ...(options.singBoxBin
+            ? { singBoxBinary: options.singBoxBin }
+            : builderConfig.runtime.dependencies.singBoxBinary
+              ? { singBoxBinary: builderConfig.runtime.dependencies.singBoxBinary }
+              : {}),
         });
         lines.push("");
         lines.push("Egress checks:");

@@ -43,6 +43,11 @@ runtime:
     kind: "signal"
     processName: "sing-box"
     signal: "HUP"
+  dependencies:
+    singBoxBinary: "/tmp/from-config-sing-box"
+    singBoxSource: "path"
+    chromeBinary: "/tmp/from-config-google-chrome"
+    chromeSource: "app-bundle"
 listeners:
   mixed:
     enabled: true
@@ -102,10 +107,6 @@ schedule:
       launchAgentsDir,
       "--logs-dir",
       logsDir,
-      "--sing-box-bin",
-      "/tmp/sing-box",
-      "--chrome-bin",
-      "/tmp/google-chrome",
       "--no-load",
     ]);
 
@@ -118,9 +119,9 @@ schedule:
     expect(plist).toContain("/node_modules/.bin/tsx");
     expect(plist).toContain("/src/cli/index.ts");
     expect(plist).toContain("<key>SING_BOX_BIN</key>");
-    expect(plist).toContain("/tmp/sing-box");
+    expect(plist).toContain("/tmp/from-config-sing-box");
     expect(plist).toContain("<key>CHROME_BIN</key>");
-    expect(plist).toContain("/tmp/google-chrome");
+    expect(plist).toContain("/tmp/from-config-google-chrome");
 
     await createProgram().parseAsync([
       "node",

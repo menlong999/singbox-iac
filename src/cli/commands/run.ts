@@ -21,7 +21,11 @@ export function registerRunCommand(program: Command): void {
 
       const exitCode = await runConfig({
         configPath,
-        ...(options.singBoxBin ? { singBoxBinary: options.singBoxBin } : {}),
+        ...(options.singBoxBin
+          ? { singBoxBinary: options.singBoxBin }
+          : builderConfig?.runtime.dependencies.singBoxBinary
+            ? { singBoxBinary: builderConfig.runtime.dependencies.singBoxBinary }
+            : {}),
         validateFirst: options.check,
       });
 

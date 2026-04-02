@@ -25,10 +25,17 @@ export function registerRollbackCommand(program: Command): void {
       const afterRestore =
         options.reload || options.singBoxBin
           ? async () => {
-              await resolveSingBoxBinary(options.singBoxBin);
+              await resolveSingBoxBinary(
+                options.singBoxBin,
+                builderConfig.runtime.dependencies.singBoxBinary,
+              );
               if (options.reload) {
                 await reloadRuntime({
-                  ...(options.singBoxBin ? { singBoxBinary: options.singBoxBin } : {}),
+                  ...(options.singBoxBin
+                    ? { singBoxBinary: options.singBoxBin }
+                    : builderConfig.runtime.dependencies.singBoxBinary
+                      ? { singBoxBinary: builderConfig.runtime.dependencies.singBoxBinary }
+                      : {}),
                   runtime: builderConfig.runtime.reload,
                 });
               }

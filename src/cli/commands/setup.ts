@@ -9,6 +9,7 @@ import type { Command } from "commander";
 import { loadConfig } from "../../config/load-config.js";
 import { generateAuthoringPlan } from "../../modules/authoring/index.js";
 import { buildConfigArtifact, resolveEffectiveIntent } from "../../modules/build/index.js";
+import { updateBuilderDesktopRuntime } from "../../modules/desktop-runtime/index.js";
 import { runDoctor } from "../../modules/doctor/index.js";
 import { initWorkspace } from "../../modules/init/index.js";
 import { applyConfig, checkConfig, resolveSingBoxBinary } from "../../modules/manager/index.js";
@@ -23,8 +24,10 @@ import {
   writeProxifierScaffold,
 } from "../../modules/proxifier/index.js";
 import { syncLocalRuleSets } from "../../modules/rule-set-sync/index.js";
+import { persistRuntimeDependencies } from "../../modules/runtime-dependencies/index.js";
 import {
   getRuntimeModeDefaults,
+  inferDesktopRuntimeProfile,
   inferRuntimeMode,
   selectVerificationScenariosForRuntimeMode,
 } from "../../modules/runtime-mode/index.js";
@@ -251,6 +254,19 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
       ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
       ...(options.launchAgentsDir ? { launchAgentsDir: resolvePath(options.launchAgentsDir) } : {}),
     });
+    const persisted = await persistRuntimeDependencies({
+      configPath,
+      ...(doctorReport.resolvedDependencies.singBox
+        ? { singBox: doctorReport.resolvedDependencies.singBox }
+        : {}),
+      ...(doctorReport.resolvedDependencies.chrome
+        ? { chrome: doctorReport.resolvedDependencies.chrome }
+        : {}),
+    });
+    if (persisted) {
+      builderConfig = await loadConfig(configPath);
+      effectiveConfig = builderConfig;
+    }
     lines.push(...formatDoctorSummary(doctorReport));
   }
 
@@ -279,6 +295,19 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
     ...(options.prompt ? { prompt: options.prompt } : {}),
   });
   const runtimeModeDefaults = getRuntimeModeDefaults(runtimeMode);
+  const desktopRuntimeProfile = inferDesktopRuntimeProfile({
+    mode: runtimeMode,
+    config: effectiveConfig,
+    ...(options.prompt ? { prompt: options.prompt } : {}),
+  });
+  if (desktopRuntimeProfile !== effectiveConfig.runtime.desktop.profile) {
+    await updateBuilderDesktopRuntime({
+      configPath,
+      profile: desktopRuntimeProfile,
+    });
+    builderConfig = await loadConfig(configPath);
+    effectiveConfig = builderConfig;
+  }
   const shouldOpenBrowser =
     options.openBrowser === true ||
     (options.openBrowser === undefined &&
@@ -287,11 +316,17 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
       runtimeModeDefaults.openVisibleBrowserByDefault);
 
   lines.push(`Runtime mode: ${runtimeMode}`);
+  lines.push(`Desktop runtime profile: ${desktopRuntimeProfile}`);
   lines.push(`Runtime DNS mode: ${runtimeModeDefaults.dnsMode}`);
   lines.push(
     `Runtime listeners: ${runtimeModeDefaults.preferredListeners.map((entry) => `in-${entry}`).join(", ")}`,
   );
   lines.push(`Schedule recommended: ${runtimeModeDefaults.scheduleRecommended ? "yes" : "no"}`);
+  if (desktopRuntimeProfile === "tun") {
+    lines.push(
+      "Desktop caveat: TUN mode depends on local macOS networking privileges and may need additional approval on first start.",
+    );
+  }
 
   if (options.proxifierOutDir || selectedProxifierBundles.length > 0) {
     const proxifierOutputDir = resolvePath(
@@ -348,8 +383,16 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
     if (shouldVerify) {
       verification = await verifyConfigRoutes({
         configPath: build.outputPath,
-        ...(options.singBoxBin ? { singBoxBinary: resolvePath(options.singBoxBin) } : {}),
-        ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
+        ...(options.singBoxBin
+          ? { singBoxBinary: resolvePath(options.singBoxBin) }
+          : effectiveConfig.runtime.dependencies.singBoxBinary
+            ? { singBoxBinary: effectiveConfig.runtime.dependencies.singBoxBinary }
+            : {}),
+        ...(options.chromeBin
+          ? { chromeBinary: resolvePath(options.chromeBin) }
+          : effectiveConfig.runtime.dependencies.chromeBinary
+            ? { chromeBinary: effectiveConfig.runtime.dependencies.chromeBinary }
+            : {}),
         configuredScenarios: effectiveConfig.verification.scenarios,
       });
       assertVerificationReportPassed(verification);
@@ -367,7 +410,11 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
         ...(effectiveConfig.output.backupPath
           ? { backupPath: effectiveConfig.output.backupPath }
           : {}),
-        ...(options.singBoxBin ? { singBoxBinary: resolvePath(options.singBoxBin) } : {}),
+        ...(options.singBoxBin
+          ? { singBoxBinary: resolvePath(options.singBoxBin) }
+          : effectiveConfig.runtime.dependencies.singBoxBinary
+            ? { singBoxBinary: effectiveConfig.runtime.dependencies.singBoxBinary }
+            : {}),
         reload: options.reload === true,
         runtime: effectiveConfig.runtime.reload,
       });
@@ -392,8 +439,16 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
       label: options.label,
       ...(options.launchAgentsDir ? { launchAgentsDir: resolvePath(options.launchAgentsDir) } : {}),
       ...(options.logsDir ? { logsDir: resolvePath(options.logsDir) } : {}),
-      ...(options.singBoxBin ? { singBoxBinary: resolvePath(options.singBoxBin) } : {}),
-      ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
+      ...(options.singBoxBin
+        ? { singBoxBinary: resolvePath(options.singBoxBin) }
+        : effectiveConfig.runtime.dependencies.singBoxBinary
+          ? { singBoxBinary: effectiveConfig.runtime.dependencies.singBoxBinary }
+          : {}),
+      ...(options.chromeBin
+        ? { chromeBinary: resolvePath(options.chromeBin) }
+        : effectiveConfig.runtime.dependencies.chromeBinary
+          ? { chromeBinary: effectiveConfig.runtime.dependencies.chromeBinary }
+          : {}),
       force: options.force === true,
       load: options.load !== false,
     });
@@ -405,7 +460,11 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
     `Proxy ports: mixed ${effectiveConfig.listeners.mixed.listen}:${effectiveConfig.listeners.mixed.port}, proxifier ${effectiveConfig.listeners.proxifier.listen}:${effectiveConfig.listeners.proxifier.port}`,
   );
   if (shouldApply) {
-    lines.push("Next: sing-box run -c ~/.config/sing-box/config.json");
+    lines.push(
+      desktopRuntimeProfile === "none"
+        ? "Next: sing-box run -c ~/.config/sing-box/config.json"
+        : "Next: singbox-iac start",
+    );
     if (schedulePath) {
       lines.push("Schedule: installed and ready for recurring updates");
     } else {
@@ -425,6 +484,7 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
   const runConfigPath = shouldApply ? effectiveConfig.output.livePath : buildSummary.outputPath;
   const singBoxBinary = await resolveSingBoxBinary(
     options.singBoxBin ? resolvePath(options.singBoxBin) : undefined,
+    effectiveConfig.runtime.dependencies.singBoxBinary,
   );
 
   await checkConfig({
@@ -473,7 +533,11 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
         scenarios: visibleScenarios,
         mixedPort: effectiveConfig.listeners.mixed.port,
         proxifierPort: effectiveConfig.listeners.proxifier.port,
-        ...(options.chromeBin ? { chromeBinary: resolvePath(options.chromeBin) } : {}),
+        ...(options.chromeBin
+          ? { chromeBinary: resolvePath(options.chromeBin) }
+          : effectiveConfig.runtime.dependencies.chromeBinary
+            ? { chromeBinary: effectiveConfig.runtime.dependencies.chromeBinary }
+            : {}),
       });
 
       process.stdout.write(

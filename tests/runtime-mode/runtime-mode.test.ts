@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { IntentIR } from "../../src/domain/intent.js";
 import {
   getRuntimeModeDefaults,
+  inferDesktopRuntimeProfile,
   inferRuntimeMode,
   selectVerificationScenariosForRuntimeMode,
 } from "../../src/modules/runtime-mode/index.js";
@@ -66,7 +67,17 @@ describe("runtime mode defaults", () => {
       openVisibleBrowserByDefault: false,
       visibleBrowserScenarioLimit: 0,
       dnsMode: "real-ip",
+      desktopProfile: "none",
     });
+  });
+
+  it("infers tun desktop profile when prompt asks for tun/global routing", () => {
+    expect(
+      inferDesktopRuntimeProfile({
+        mode: "browser-proxy",
+        prompt: "开启 tun 全局模式",
+      }),
+    ).toBe("tun");
   });
 
   it("orders process-aware scenarios first in process-proxy mode", () => {

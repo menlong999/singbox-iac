@@ -16,10 +16,14 @@ import { registerInitCommand } from "./commands/init.js";
 import { registerProxifierCommand } from "./commands/proxifier.js";
 import { registerQuickstartCommand } from "./commands/quickstart.js";
 import { registerReloadCommand } from "./commands/reload.js";
+import { registerRestartCommand } from "./commands/restart.js";
 import { registerRollbackCommand } from "./commands/rollback.js";
 import { registerRunCommand } from "./commands/run.js";
 import { registerScheduleCommand } from "./commands/schedule.js";
 import { registerSetupCommand } from "./commands/setup.js";
+import { registerStartCommand } from "./commands/start.js";
+import { registerStatusCommand } from "./commands/status.js";
+import { registerStopCommand } from "./commands/stop.js";
 import { registerTemplatesCommand } from "./commands/templates.js";
 import { registerUpdateCommand } from "./commands/update.js";
 import { registerUseCommand } from "./commands/use.js";
@@ -41,6 +45,10 @@ export function createProgram(): Command {
         "  singbox-iac use <一句话需求>",
         "  singbox-iac update",
         "",
+        "Health/debug:",
+        "  singbox-iac status",
+        "  singbox-iac start | stop | restart",
+        "",
         "Advanced commands: quickstart, setup, author, build, verify, proxifier, schedule",
       ].join("\n"),
     );
@@ -50,6 +58,10 @@ export function createProgram(): Command {
   registerUpdateCommand(program);
   registerInitCommand(program);
   registerSetupCommand(program);
+  registerStatusCommand(program);
+  registerStartCommand(program);
+  registerStopCommand(program);
+  registerRestartCommand(program);
   registerQuickstartCommand(program);
   registerAuthorCommand(program);
   registerBuildCommand(program);
@@ -73,6 +85,10 @@ function hideAdvancedCommands(program: Command): void {
   for (const commandName of [
     "init",
     "setup",
+    "status",
+    "start",
+    "stop",
+    "restart",
     "quickstart",
     "author",
     "build",

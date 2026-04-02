@@ -75,6 +75,16 @@ function makeConfig(): BuilderConfig {
         processName: "sing-box",
         signal: "HUP",
       },
+      dependencies: {},
+      desktop: {
+        profile: "system-proxy",
+        launchAgentLabel: "org.singbox-iac.runtime",
+        tun: {
+          autoRoute: true,
+          strictRoute: false,
+          addresses: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+        },
+      },
     },
     listeners: {
       mixed: { enabled: true, listen: "127.0.0.1", port: 39097 },

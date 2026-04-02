@@ -190,6 +190,16 @@ export async function runAuthorFlow(options: AuthorCommandOptions): Promise<void
       label: options.label,
       ...(options.launchAgentsDir ? { launchAgentsDir: resolvePath(options.launchAgentsDir) } : {}),
       ...(options.logsDir ? { logsDir: resolvePath(options.logsDir) } : {}),
+      ...(options.singBoxBin
+        ? { singBoxBinary: resolvePath(options.singBoxBin) }
+        : effectiveConfig.runtime.dependencies.singBoxBinary
+          ? { singBoxBinary: effectiveConfig.runtime.dependencies.singBoxBinary }
+          : {}),
+      ...(options.chromeBin
+        ? { chromeBinary: resolvePath(options.chromeBin) }
+        : effectiveConfig.runtime.dependencies.chromeBinary
+          ? { chromeBinary: effectiveConfig.runtime.dependencies.chromeBinary }
+          : {}),
       force: options.forceSchedule === true,
       load: options.load !== false,
     });
