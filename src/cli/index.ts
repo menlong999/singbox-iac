@@ -35,7 +35,7 @@ export function createProgram(): Command {
   program
     .name("singbox-iac")
     .description("Policy-first subscription compiler for sing-box on macOS.")
-    .version("0.1.6")
+    .version("0.1.9")
     .addHelpText(
       "after",
       [
