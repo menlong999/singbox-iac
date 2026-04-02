@@ -8,11 +8,13 @@ export interface InitWorkspaceInput {
   readonly examplesDir: string;
   readonly subscriptionUrl?: string;
   readonly force?: boolean;
+  readonly preserveExistingRules?: boolean;
 }
 
 export interface InitWorkspaceResult {
   readonly configPath: string;
   readonly rulesPath: string;
+  readonly reusedExistingRules: boolean;
 }
 
 export async function initWorkspace(input: InitWorkspaceInput): Promise<InitWorkspaceResult> {
@@ -36,21 +38,36 @@ export async function initWorkspace(input: InitWorkspaceInput): Promise<InitWork
   );
 
   await writeIfAllowed(input.configOutPath, configWithRulesPath, input.force === true);
-  await writeIfAllowed(input.rulesOutPath, rulesTemplate, input.force === true);
+  const reusedExistingRules = await writeIfAllowed(
+    input.rulesOutPath,
+    rulesTemplate,
+    input.force === true,
+    input.preserveExistingRules === true,
+  );
 
   return {
     configPath: input.configOutPath,
     rulesPath: input.rulesOutPath,
+    reusedExistingRules,
   };
 }
 
-async function writeIfAllowed(filePath: string, content: string, force: boolean): Promise<void> {
+async function writeIfAllowed(
+  filePath: string,
+  content: string,
+  force: boolean,
+  preserveExisting = false,
+): Promise<boolean> {
   if (!force && (await pathExists(filePath))) {
+    if (preserveExisting) {
+      return true;
+    }
     throw new Error(`Refusing to overwrite existing file: ${filePath}`);
   }
 
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, content, "utf8");
+  return false;
 }
 
 async function pathExists(filePath: string): Promise<boolean> {

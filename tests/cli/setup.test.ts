@@ -1,4 +1,12 @@
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -115,6 +123,58 @@ describe("setup command", () => {
     expect(output).toContain("Rule set 1/");
     expect(output).toContain("Proxifier guide:");
     expect(writeSpy).toHaveBeenCalled();
+  });
+
+  it("reuses an existing rules file during first-time setup when the config is missing", async () => {
+    const homeDir = mkdtempSync(path.join(tmpdir(), "singbox-iac-home-existing-rules-"));
+    tempDirs.push(homeDir);
+    process.env.HOME = homeDir;
+
+    const fakeSingBox = path.join(homeDir, "fake-sing-box");
+    const fakeChrome = path.join(homeDir, "fake-chrome");
+    writeExecutable(fakeSingBox);
+    writeExecutable(fakeChrome);
+
+    const rulesPath = path.join(homeDir, ".config", "singbox-iac", "rules", "custom.rules.yaml");
+    mkdirSync(path.dirname(rulesPath), { recursive: true });
+    writeFileSync(rulesPath, "version: 1\nbeforeBuiltins: []\nafterBuiltins: []\n", "utf8");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | RequestInfo) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : String(input);
+        if (url === "https://example.com/subscription") {
+          return new Response(fixtureContent, { status: 200 });
+        }
+        if (url.startsWith("https://raw.githubusercontent.com/SagerNet/")) {
+          return new Response("stub-ruleset", { status: 200 });
+        }
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }),
+    );
+
+    await createProgram().parseAsync([
+      "node",
+      "singbox-iac",
+      "setup",
+      "--subscription-url",
+      "https://example.com/subscription",
+      "--prompt",
+      "国内直连，Google Stitch 走美国",
+      "--sing-box-bin",
+      fakeSingBox,
+      "--chrome-bin",
+      fakeChrome,
+    ]);
+
+    const configPath = path.join(homeDir, ".config", "singbox-iac", "builder.config.yaml");
+    expect(existsSync(configPath)).toBe(true);
+    expect(readFileSync(rulesPath, "utf8")).toContain("version: 1");
   });
 });
 

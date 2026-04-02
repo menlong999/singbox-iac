@@ -116,6 +116,7 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
       examplesDir: path.join(resolvePackageRoot(import.meta.url), "examples"),
       subscriptionUrl: options.subscriptionUrl,
       force: options.force === true,
+      preserveExistingRules: true,
     });
   }
 
