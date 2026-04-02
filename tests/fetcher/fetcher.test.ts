@@ -50,4 +50,32 @@ describe("fetchSubscription", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it("continues trying later user agents when an earlier response is not a line-based subscription", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response('{"outbounds":[]}', { status: 200 }))
+      .mockResolvedValueOnce(new Response("trojan://password@example.com:443?sni=example.com"));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      fetchSubscription({
+        url: "https://example.com/subscription",
+        retryAttempts: 1,
+      }),
+    ).resolves.toContain("trojan://");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      headers: expect.objectContaining({
+        "user-agent": "subconverter/1.0",
+      }),
+    });
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
+      headers: expect.objectContaining({
+        "user-agent": "curl/8.7.1",
+      }),
+    });
+  });
 });

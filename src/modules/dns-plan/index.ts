@@ -15,7 +15,6 @@ export function buildDnsPlan(input: {
     {
       type: "local",
       tag: defaultLocalServerTag,
-      preferGo: true,
     },
     {
       type: "tcp",
@@ -100,7 +99,6 @@ export function compileDnsPlan(plan: DNSPlan): Record<string, unknown> {
     servers: plan.servers.map((server) => ({
       type: server.type,
       tag: server.tag,
-      ...(server.preferGo ? { prefer_go: true } : {}),
       ...(server.server ? { server: server.server } : {}),
       ...(server.serverPort ? { server_port: server.serverPort } : {}),
     })),

@@ -43,6 +43,10 @@ export interface RuntimeAgentRemoveInput {
   readonly unload?: boolean;
 }
 
+export interface RuntimeAgentRestartInput {
+  readonly label?: string;
+}
+
 export const defaultRuntimeLaunchAgentLabel = "org.singbox-iac.runtime";
 
 export function resolveDesktopRuntimeProfile(config: BuilderConfig): DesktopRuntimeProfile {
@@ -147,6 +151,12 @@ export async function removeDesktopRuntimeAgent(input: RuntimeAgentRemoveInput):
 
   await rm(plistPath, { force: true });
   return plistPath;
+}
+
+export async function restartDesktopRuntimeAgent(input: RuntimeAgentRestartInput): Promise<string> {
+  const label = input.label ?? defaultRuntimeLaunchAgentLabel;
+  await runLaunchctl(["kickstart", "-k", launchctlDomainService(label)]);
+  return label;
 }
 
 export function renderRuntimeLaunchAgentPlist(input: {

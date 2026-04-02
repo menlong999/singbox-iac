@@ -180,7 +180,7 @@ describe("compileConfig", () => {
       { tag: "in-proxifier", listen: "127.0.0.1", listen_port: 39091 },
     ]);
     expect(dns.servers).toMatchObject([
-      { type: "local", tag: "dns-local-default", prefer_go: true },
+      { type: "local", tag: "dns-local-default" },
       { type: "tcp", tag: "dns-remote-primary", server: "1.1.1.1", server_port: 53 },
       { type: "tcp", tag: "dns-remote-cn", server: "223.5.5.5", server_port: 53 },
     ]);

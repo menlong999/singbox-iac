@@ -5,6 +5,7 @@ import type { Command } from "commander";
 import {
   installDesktopRuntimeAgent,
   removeDesktopRuntimeAgent,
+  restartDesktopRuntimeAgent,
 } from "../../modules/desktop-runtime/index.js";
 import { checkConfig, resolveSingBoxBinary } from "../../modules/manager/index.js";
 import { resolveBuilderConfig } from "../command-helpers.js";
@@ -39,6 +40,29 @@ export function registerRestartCommand(program: Command): void {
         configPath: builderConfig.output.livePath,
         singBoxBinary,
       });
+
+      const hasOverrides =
+        options.singBoxBin !== undefined ||
+        options.launchAgentsDir !== undefined ||
+        options.logsDir !== undefined;
+
+      if (options.load !== false && !hasOverrides) {
+        try {
+          await restartDesktopRuntimeAgent({ label });
+          process.stdout.write(
+            `${[
+              `Restarted desktop runtime profile: ${builderConfig.runtime.desktop.profile}`,
+              `Label: ${label}`,
+              `Live config: ${builderConfig.output.livePath}`,
+              "Method: launchctl kickstart -k",
+            ].join("\n")}\n`,
+          );
+          return;
+        } catch {
+          // Fall through to a full remove/install when the service is not loaded.
+        }
+      }
+
       await removeDesktopRuntimeAgent({
         label,
         ...(options.launchAgentsDir

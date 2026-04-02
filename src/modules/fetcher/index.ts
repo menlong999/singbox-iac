@@ -4,7 +4,14 @@ export interface FetchSubscriptionInput {
 }
 
 export async function fetchSubscription(input: FetchSubscriptionInput): Promise<string> {
-  const userAgents = ["subconverter/1.0", "curl/8.7.1", "singbox-iac/0.1"];
+  const userAgents = [
+    "subconverter/1.0",
+    "curl/8.7.1",
+    "sing-box",
+    "Mozilla/5.0",
+    "Clash",
+    "singbox-iac/0.1",
+  ];
   const retryAttempts = Math.max(1, input.retryAttempts ?? 3);
   let fallbackContent = "";
   let lastError: Error | undefined;

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { Command } from "commander";
@@ -35,7 +35,7 @@ export function createProgram(): Command {
   program
     .name("singbox-iac")
     .description("Policy-first subscription compiler for sing-box on macOS.")
-    .version("0.1.9")
+    .version(readPackageVersion())
     .addHelpText(
       "after",
       [
@@ -79,6 +79,18 @@ export function createProgram(): Command {
   hideAdvancedCommands(program);
 
   return program;
+}
+
+function readPackageVersion(): string {
+  try {
+    const packageJsonPath = new URL("../../package.json", import.meta.url);
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
+      version?: string;
+    };
+    return packageJson.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
 }
 
 function hideAdvancedCommands(program: Command): void {

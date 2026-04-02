@@ -29,7 +29,7 @@ describe("desktop runtime commands", () => {
     writeExecutable(fakeSingBox);
     writeFileSync(
       livePath,
-      '{"log":{"level":"info"},"dns":{"servers":[{"type":"local","tag":"dns-local-default","prefer_go":true}],"final":"dns-local-default","strategy":"prefer_ipv4"},"inbounds":[{"type":"mixed","tag":"in-mixed","listen":"127.0.0.1","listen_port":39097,"set_system_proxy":true},{"type":"mixed","tag":"in-proxifier","listen":"127.0.0.1","listen_port":39091}],"outbounds":[{"type":"direct","tag":"direct"},{"type":"selector","tag":"Global","outbounds":["direct"]}],"route":{"rules":[{"action":"sniff"}],"final":"Global","auto_detect_interface":true,"default_domain_resolver":"dns-local-default"}}\n',
+      '{"log":{"level":"info"},"dns":{"servers":[{"type":"local","tag":"dns-local-default"}],"final":"dns-local-default","strategy":"prefer_ipv4"},"inbounds":[{"type":"mixed","tag":"in-mixed","listen":"127.0.0.1","listen_port":39097,"set_system_proxy":true},{"type":"mixed","tag":"in-proxifier","listen":"127.0.0.1","listen_port":39091}],"outbounds":[{"type":"direct","tag":"direct"},{"type":"selector","tag":"Global","outbounds":["direct"]}],"route":{"rules":[{"action":"sniff"}],"final":"Global","auto_detect_interface":true,"default_domain_resolver":"dns-local-default"}}\n',
     );
 
     writeFileSync(

@@ -13,7 +13,7 @@ describe("verification helpers", () => {
       log: { level: "info" },
       dns: {
         servers: [
-          { type: "local", tag: "dns-local-default", prefer_go: true },
+          { type: "local", tag: "dns-local-default" },
           { type: "udp", tag: "dns-remote-primary", server: "1.1.1.1", server_port: 53 },
           { type: "udp", tag: "dns-remote-cn", server: "223.5.5.5", server_port: 53 },
         ],
@@ -107,13 +107,12 @@ describe("verification helpers", () => {
     expect(
       (
         prepared.config.dns as {
-          servers: Array<{ type: string; tag: string; prefer_go?: boolean }>;
+          servers: Array<{ type: string; tag: string }>;
         }
       ).servers[0],
     ).toMatchObject({
       type: "local",
       tag: "dns-local-verify",
-      prefer_go: true,
     });
     expect(
       (prepared.config.route as { default_domain_resolver: string }).default_domain_resolver,
@@ -127,7 +126,7 @@ describe("verification helpers", () => {
     const config = {
       dns: {
         servers: [
-          { type: "local", tag: "dns-local-default", prefer_go: true },
+          { type: "local", tag: "dns-local-default" },
           { type: "tcp", tag: "dns-remote-primary", server: "1.1.1.1", server_port: 53 },
           { type: "tcp", tag: "dns-remote-cn", server: "223.5.5.5", server_port: 53 },
         ],

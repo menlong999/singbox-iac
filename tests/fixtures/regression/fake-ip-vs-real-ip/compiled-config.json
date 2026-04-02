@@ -6,8 +6,7 @@
     "servers": [
       {
         "type": "local",
-        "tag": "dns-local-default",
-        "prefer_go": true
+        "tag": "dns-local-default"
       },
       {
         "type": "tcp",

@@ -620,7 +620,6 @@ export async function prepareVerificationConfig(
     {
       type: "local",
       tag: "dns-local-verify",
-      prefer_go: true,
     },
   ];
   dns.final = "dns-local-verify";
