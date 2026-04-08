@@ -2,7 +2,7 @@ import path from "node:path";
 
 import type { Command } from "commander";
 
-import { collectStatusReport } from "../../modules/status/index.js";
+import { type StatusSystemProxyService, collectStatusReport } from "../../modules/status/index.js";
 import { findDefaultConfigPath, resolveBuilderConfig } from "../command-helpers.js";
 
 export function registerStatusCommand(program: Command): void {
@@ -60,6 +60,57 @@ export function registerStatusCommand(program: Command): void {
         `Process: ${report.runtime.processRunning ? "running" : "stopped"}${
           report.runtime.processIds.length > 0 ? ` (${report.runtime.processIds.join(", ")})` : ""
         }`,
+        ...(report.runtime.systemProxy
+          ? [
+              `System proxy: state=${report.runtime.systemProxy.state}${
+                report.runtime.systemProxy.drift !== undefined
+                  ? ` drift=${String(report.runtime.systemProxy.drift)}`
+                  : ""
+              } expected=${formatProxyEndpoint(report.runtime.systemProxy.expected)} actual=${formatSystemProxyServices(report.runtime.systemProxy.actual)}`,
+              ...(report.runtime.systemProxy.nextAction
+                ? [`Proxy hint: ${report.runtime.systemProxy.nextAction}`]
+                : []),
+            ]
+          : []),
+        ...(report.runtime.watchdog
+          ? [
+              `Watchdog: enabled=${String(report.runtime.watchdog.enabled)} label=${report.runtime.watchdog.label} installed=${String(report.runtime.watchdog.launchAgentInstalled)}${
+                report.runtime.watchdog.launchAgentLoaded !== undefined
+                  ? ` loaded=${String(report.runtime.watchdog.launchAgentLoaded)}`
+                  : ""
+              } interval=${report.runtime.watchdog.intervalSeconds}s${
+                report.runtime.watchdog.lastResult
+                  ? ` last-result=${report.runtime.watchdog.lastResult}`
+                  : ""
+              }${
+                report.runtime.watchdog.lastRecoveryAction
+                  ? ` last-action=${report.runtime.watchdog.lastRecoveryAction}`
+                  : ""
+              }${
+                report.runtime.watchdog.lastTrigger
+                  ? ` last-trigger=${report.runtime.watchdog.lastTrigger}`
+                  : ""
+              }${
+                report.runtime.watchdog.lastCheckedAt
+                  ? ` last-recorded=${report.runtime.watchdog.lastCheckedAt}`
+                  : ""
+              }${
+                report.runtime.watchdog.lastReassertAt
+                  ? ` last-reassert=${report.runtime.watchdog.lastReassertAt}`
+                  : ""
+              }${
+                report.runtime.watchdog.lastRestartAt
+                  ? ` last-restart=${report.runtime.watchdog.lastRestartAt}`
+                  : ""
+              }`,
+              ...(report.runtime.watchdog.lastMessage
+                ? [`Watchdog message: ${report.runtime.watchdog.lastMessage}`]
+                : []),
+              ...(report.runtime.watchdog.lastError
+                ? [`Watchdog error: ${report.runtime.watchdog.lastError}`]
+                : []),
+            ]
+          : []),
         `Live config: ${report.config.livePath ?? "(unset)"}${
           report.config.liveExists ? " [present]" : " [missing]"
         }`,
@@ -95,4 +146,31 @@ interface StatusCommandOptions {
 
 function resolvePath(filePath: string): string {
   return filePath.startsWith("/") ? filePath : path.resolve(process.cwd(), filePath);
+}
+
+function formatProxyEndpoint(endpoint: { host: string; port: number }): string {
+  return `${endpoint.host}:${endpoint.port}`;
+}
+
+function formatSystemProxyServices(services: readonly StatusSystemProxyService[]): string {
+  if (services.length === 0) {
+    return "unknown";
+  }
+
+  const enabledServices = services.filter((service) => service.enabled);
+  if (enabledServices.length === 0) {
+    return "inactive";
+  }
+
+  return enabledServices
+    .map((service) => `${service.kind}=${formatSystemProxyService(service)}`)
+    .join(", ");
+}
+
+function formatSystemProxyService(service: StatusSystemProxyService): string {
+  if (service.host && typeof service.port === "number") {
+    return `${service.host}:${service.port}`;
+  }
+
+  return "(incomplete)";
 }

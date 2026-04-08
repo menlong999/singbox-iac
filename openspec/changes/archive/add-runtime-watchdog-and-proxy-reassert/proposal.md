@@ -17,7 +17,9 @@ The current desktop runtime does not yet reassert system proxy state when macOS 
   - runtime process is alive
   - `in-mixed` listener is active
   - macOS system proxy still points to the configured endpoint
+- default the watchdog interval to 60 seconds so it stays lightweight in steady state
 - reassert proxy state when the process is healthy but proxy state drifted
+- persist watchdog state only when the recorded result changes
 - expose watchdog activity in logs and status
 
 ## Out of Scope

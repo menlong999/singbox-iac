@@ -180,20 +180,23 @@ singbox-iac start
 singbox-iac stop
 singbox-iac restart
 singbox-iac status
+singbox-iac diagnose
 ```
 
 - `start`：以 macOS 专用 LaunchAgent 启动桌面运行时
 - `stop`：停止桌面运行时，并让 `sing-box` 释放系统代理或 TUN 资源
 - `restart`：重新拉起桌面运行时
 - `status`：汇总 live config、桌面运行时、系统代理 / TUN 状态、schedule 和最近一次事务
+- `diagnose`：在 `status` 之上追加默认路由、系统 DNS 和代表性域名解析证据，适合排查“为什么现在网络还是不对”
 
 排障时优先用：
 
 ```bash
 singbox-iac status
+singbox-iac diagnose
 ```
 
-它会汇总当前 `sing-box` binary、live config、进程状态、监听端口、schedule 状态和最近一次发布事务。
+`status` 适合看当前运行快照；`diagnose` 适合继续判断问题更像是运行时漂移、系统 DNS/默认路由异常，还是最近一次发布没有生效。
 
 其余命令都可以理解为高级命令，主要用于调试、排障或更细粒度控制。
 

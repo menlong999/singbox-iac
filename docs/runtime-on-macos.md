@@ -63,12 +63,62 @@ singbox-iac start
 singbox-iac stop
 singbox-iac restart
 singbox-iac status
+singbox-iac diagnose
 ```
 
 - `start` writes or refreshes a dedicated runtime LaunchAgent and boots it
 - `stop` unloads and removes that runtime LaunchAgent
 - `restart` replaces the runtime LaunchAgent
 - `status` reports `sing-box` binary resolution, live config presence, desktop runtime state, system proxy/TUN hints, scheduler state, and recent transactions
+- `diagnose` adds a higher-level local-network and DNS evidence pass on top of `status`
+
+Use the commands this way:
+
+- `doctor`: first-run or packaging readiness, such as missing binaries, unwritable LaunchAgents, or missing rule-set files
+- `status`: current runtime snapshot, including process state, listeners, system proxy/TUN state, scheduler state, and recent publish history
+- `diagnose`: failure triage when `status` is not enough, because it combines runtime state with best-effort default-route, system DNS, and representative domain resolution evidence
+
+For the default `system-proxy` desktop profile, `status` now compares the expected `in-mixed` endpoint against the current macOS proxy state and makes drift explicit.
+
+At minimum it distinguishes:
+
+- runtime stopped
+- runtime running with proxy active
+- runtime running with proxy drift because the proxy is inactive
+- runtime running with proxy drift because the proxy endpoint no longer matches
+- runtime running with proxy drift because `in-mixed` is no longer accepting connections
+
+When drift is present, `status` prints:
+
+- the expected `in-mixed` host and port
+- the currently enabled macOS proxy endpoint state
+- a short next-action hint such as restarting the desktop runtime
+
+## Runtime Watchdog
+
+For the current `system-proxy` desktop profile, `start` also installs a lightweight runtime watchdog LaunchAgent by default.
+
+The watchdog currently:
+
+- wakes up on a fixed 60-second interval by default
+- checks whether the `sing-box` process is still alive
+- checks whether `in-mixed` is still accepting connections
+- checks whether macOS system proxy state still points to the configured `in-mixed` endpoint
+- reasserts the proxy endpoint when drift is detected but the runtime process is otherwise healthy
+- escalates to a runtime LaunchAgent restart when the runtime is already unhealthy or reassert does not recover the runtime
+
+Current limits:
+
+- only `system-proxy` desktop mode is covered
+- the watchdog records state changes for `status`, including the last successful reassert time when one exists
+- identical repeated poll results do not rewrite the watchdog state file
+- proxy reassert relies on the normal macOS network service tooling, so failures remain visible in watchdog status and logs instead of being silently ignored
+
+Sleep/wake and network-change recovery in the current phase is symptom-driven, not event-hook driven:
+
+- there is no second always-on LaunchAgent that subscribes to native macOS wake or network notifications
+- the normal watchdog tick detects the common aftermath within the next polling window
+- runtime restart escalation is guarded by a fixed 5-minute cooldown so repeated failures do not cause a restart every 60 seconds
 
 ## Launchd Notes
 

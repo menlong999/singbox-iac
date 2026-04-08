@@ -4,7 +4,12 @@ import type { Command } from "commander";
 
 import { installDesktopRuntimeAgent } from "../../modules/desktop-runtime/index.js";
 import { checkConfig, resolveSingBoxBinary } from "../../modules/manager/index.js";
-import { resolveBuilderConfig } from "../command-helpers.js";
+import { installRuntimeWatchdogAgent } from "../../modules/runtime-watchdog/index.js";
+import {
+  findDefaultConfigPath,
+  resolveBuilderConfig,
+  resolveCliEntrypoint,
+} from "../command-helpers.js";
 
 export function registerStartCommand(program: Command): void {
   program
@@ -19,8 +24,14 @@ export function registerStartCommand(program: Command): void {
     .option("--no-load", "write the runtime LaunchAgent without calling launchctl bootstrap")
     .action(async (options: StartCommandOptions) => {
       const builderConfig = await resolveBuilderConfig(options);
+      const configPath = options.config
+        ? resolvePath(options.config)
+        : await findDefaultConfigPath();
       if (!builderConfig) {
         throw new Error("Start requires a builder config. Run `singbox-iac go` first.");
+      }
+      if (!configPath) {
+        throw new Error("Start requires a builder config path.");
       }
       if (builderConfig.runtime.desktop.profile === "none") {
         throw new Error(
@@ -48,6 +59,22 @@ export function registerStartCommand(program: Command): void {
         force: options.force === true,
         load: options.load !== false,
       });
+      const watchdogResult =
+        builderConfig.runtime.desktop.profile === "system-proxy" &&
+        builderConfig.runtime.desktop.watchdog.enabled
+          ? await installRuntimeWatchdogAgent({
+              configPath,
+              cliEntrypoint: resolveCliEntrypoint(import.meta.url),
+              intervalSeconds: builderConfig.runtime.desktop.watchdog.intervalSeconds,
+              label: builderConfig.runtime.desktop.watchdog.launchAgentLabel,
+              ...(options.launchAgentsDir
+                ? { launchAgentsDir: resolvePath(options.launchAgentsDir) }
+                : {}),
+              ...(options.logsDir ? { logsDir: resolvePath(options.logsDir) } : {}),
+              force: options.force === true,
+              load: options.load !== false,
+            })
+          : undefined;
 
       process.stdout.write(
         `${[
@@ -55,6 +82,12 @@ export function registerStartCommand(program: Command): void {
           `Label: ${result.label}`,
           `Live config: ${builderConfig.output.livePath}`,
           `LaunchAgent: ${result.plistPath}`,
+          ...(watchdogResult
+            ? [
+                `Watchdog: ${watchdogResult.label}`,
+                `Watchdog LaunchAgent: ${watchdogResult.plistPath}`,
+              ]
+            : []),
         ].join("\n")}\n`,
       );
     });

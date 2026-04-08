@@ -47,7 +47,19 @@ export interface RuntimeAgentRestartInput {
   readonly label?: string;
 }
 
+export interface RuntimeAgentRecoverInput {
+  readonly label?: string;
+  readonly launchAgentsDir?: string;
+}
+
+export interface RuntimeAgentRecoverResult {
+  readonly label: string;
+  readonly plistPath: string;
+  readonly method: "kickstart" | "bootstrap";
+}
+
 export const defaultRuntimeLaunchAgentLabel = "org.singbox-iac.runtime";
+export const defaultRuntimeWatchdogLaunchAgentLabel = "org.singbox-iac.runtime.watchdog";
 
 export function resolveDesktopRuntimeProfile(config: BuilderConfig): DesktopRuntimeProfile {
   if (config.runtime.desktop.profile === "tun") {
@@ -88,6 +100,14 @@ export async function updateBuilderDesktopRuntime(input: {
           "172.19.0.1/30",
           "fdfe:dcba:9876::1/126",
         ],
+      },
+      watchdog: {
+        ...(parsed.runtime?.desktop?.watchdog ?? {}),
+        enabled: parsed.runtime?.desktop?.watchdog?.enabled ?? true,
+        intervalSeconds: parsed.runtime?.desktop?.watchdog?.intervalSeconds ?? 60,
+        launchAgentLabel:
+          parsed.runtime?.desktop?.watchdog?.launchAgentLabel ??
+          defaultRuntimeWatchdogLaunchAgentLabel,
       },
     },
   };
@@ -157,6 +177,42 @@ export async function restartDesktopRuntimeAgent(input: RuntimeAgentRestartInput
   const label = input.label ?? defaultRuntimeLaunchAgentLabel;
   await runLaunchctl(["kickstart", "-k", launchctlDomainService(label)]);
   return label;
+}
+
+export async function recoverDesktopRuntimeAgent(
+  input: RuntimeAgentRecoverInput,
+): Promise<RuntimeAgentRecoverResult> {
+  const label = input.label ?? defaultRuntimeLaunchAgentLabel;
+  const launchAgentsDir = input.launchAgentsDir ?? path.join(homedir(), "Library", "LaunchAgents");
+  const plistPath = path.join(launchAgentsDir, `${label}.plist`);
+
+  if (!(await pathExists(plistPath))) {
+    throw new Error(`Runtime LaunchAgent does not exist: ${plistPath}`);
+  }
+
+  try {
+    await runLaunchctl(["kickstart", "-k", launchctlDomainService(label)]);
+    return {
+      label,
+      plistPath,
+      method: "kickstart",
+    };
+  } catch (kickstartError) {
+    try {
+      await runLaunchctl(["bootstrap", launchctlDomain(), plistPath]);
+      return {
+        label,
+        plistPath,
+        method: "bootstrap",
+      };
+    } catch (bootstrapError) {
+      const details = [
+        kickstartError instanceof Error ? `kickstart: ${kickstartError.message}` : undefined,
+        bootstrapError instanceof Error ? `bootstrap: ${bootstrapError.message}` : undefined,
+      ].filter((value): value is string => Boolean(value));
+      throw new Error(details.join("\n") || `Failed to recover runtime LaunchAgent: ${label}`);
+    }
+  }
 }
 
 export function renderRuntimeLaunchAgentPlist(input: {

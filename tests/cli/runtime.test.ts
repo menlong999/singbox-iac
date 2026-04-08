@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createProgram } from "../../src/cli/index.js";
+import { defaultRuntimeWatchdogLaunchAgentLabel } from "../../src/modules/runtime-watchdog/index.js";
 
 describe("desktop runtime commands", () => {
   const tempDirs: string[] = [];
@@ -126,8 +127,15 @@ authoring:
     ]);
 
     const plistPath = path.join(launchAgentsDir, `${label}.plist`);
+    const watchdogPlistPath = path.join(
+      launchAgentsDir,
+      `${defaultRuntimeWatchdogLaunchAgentLabel}.plist`,
+    );
     expect(existsSync(plistPath)).toBe(true);
+    expect(existsSync(watchdogPlistPath)).toBe(true);
     expect(readFileSync(plistPath, "utf8")).toContain(livePath);
+    expect(readFileSync(watchdogPlistPath, "utf8")).toContain("runtime-watchdog");
+    expect(readFileSync(watchdogPlistPath, "utf8")).toContain("<integer>60</integer>");
 
     await createProgram().parseAsync([
       "node",
@@ -140,6 +148,7 @@ authoring:
       "--no-unload",
     ]);
     expect(existsSync(plistPath)).toBe(false);
+    expect(existsSync(watchdogPlistPath)).toBe(false);
 
     await createProgram().parseAsync([
       "node",
@@ -154,6 +163,7 @@ authoring:
       "--no-load",
     ]);
     expect(existsSync(plistPath)).toBe(true);
+    expect(existsSync(watchdogPlistPath)).toBe(true);
     expect(writeSpy).toHaveBeenCalled();
   });
 });

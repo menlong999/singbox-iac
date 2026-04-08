@@ -12,15 +12,18 @@ Manual `restart` is an acceptable workaround, but not a product-level daily-driv
 
 ## What Changes
 
-- add recovery hooks or recovery-aware runtime checks for sleep/wake and network-change events
+- treat the existing runtime watchdog as the minimum viable recovery signal source instead of adding a new always-on event watcher
+- make the watchdog detect the common post-sleep and post-network-change symptoms within its normal polling cycle
 - prefer light recovery first:
   - reassert proxy
   - refresh listener health
 - escalate to runtime restart only when lighter recovery fails
+- guard repeated runtime restarts with a fixed 5-minute cooldown so a bad environment does not churn every 60 seconds
 - make recovery activity visible in diagnostics
 
 ## Out of Scope
 
+- a separate LaunchAgent that subscribes to native sleep/wake or network-change notifications
 - full TUN lifecycle management
 - OS-wide daemon supervision
 - non-macOS implementations

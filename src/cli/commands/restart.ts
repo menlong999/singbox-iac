@@ -8,7 +8,15 @@ import {
   restartDesktopRuntimeAgent,
 } from "../../modules/desktop-runtime/index.js";
 import { checkConfig, resolveSingBoxBinary } from "../../modules/manager/index.js";
-import { resolveBuilderConfig } from "../command-helpers.js";
+import {
+  installRuntimeWatchdogAgent,
+  removeRuntimeWatchdogAgent,
+} from "../../modules/runtime-watchdog/index.js";
+import {
+  findDefaultConfigPath,
+  resolveBuilderConfig,
+  resolveCliEntrypoint,
+} from "../command-helpers.js";
 
 export function registerRestartCommand(program: Command): void {
   program
@@ -22,8 +30,14 @@ export function registerRestartCommand(program: Command): void {
     .option("--no-load", "write the runtime LaunchAgent without calling launchctl bootstrap")
     .action(async (options: RestartCommandOptions) => {
       const builderConfig = await resolveBuilderConfig(options);
+      const configPath = options.config
+        ? resolvePath(options.config)
+        : await findDefaultConfigPath();
       if (!builderConfig) {
         throw new Error("Restart requires a builder config. Run `singbox-iac go` first.");
+      }
+      if (!configPath) {
+        throw new Error("Restart requires a builder config path.");
       }
       if (builderConfig.runtime.desktop.profile === "none") {
         throw new Error(
@@ -32,6 +46,7 @@ export function registerRestartCommand(program: Command): void {
       }
 
       const label = options.label ?? builderConfig.runtime.desktop.launchAgentLabel;
+      const watchdogLabel = builderConfig.runtime.desktop.watchdog.launchAgentLabel;
       const singBoxBinary = await resolveSingBoxBinary(
         options.singBoxBin ? resolvePath(options.singBoxBin) : undefined,
         builderConfig.runtime.dependencies.singBoxBinary,
@@ -45,8 +60,11 @@ export function registerRestartCommand(program: Command): void {
         options.singBoxBin !== undefined ||
         options.launchAgentsDir !== undefined ||
         options.logsDir !== undefined;
+      const needsWatchdogLifecycle =
+        builderConfig.runtime.desktop.profile === "system-proxy" &&
+        builderConfig.runtime.desktop.watchdog.enabled;
 
-      if (options.load !== false && !hasOverrides) {
+      if (options.load !== false && !hasOverrides && !needsWatchdogLifecycle) {
         try {
           await restartDesktopRuntimeAgent({ label });
           process.stdout.write(
@@ -69,6 +87,17 @@ export function registerRestartCommand(program: Command): void {
           ? { launchAgentsDir: resolvePath(options.launchAgentsDir) }
           : {}),
       });
+      if (
+        builderConfig.runtime.desktop.profile === "system-proxy" &&
+        builderConfig.runtime.desktop.watchdog.enabled
+      ) {
+        await removeRuntimeWatchdogAgent({
+          label: watchdogLabel,
+          ...(options.launchAgentsDir
+            ? { launchAgentsDir: resolvePath(options.launchAgentsDir) }
+            : {}),
+        });
+      }
 
       const result = await installDesktopRuntimeAgent({
         liveConfigPath: builderConfig.output.livePath,
@@ -81,6 +110,22 @@ export function registerRestartCommand(program: Command): void {
         force: true,
         load: options.load !== false,
       });
+      const watchdogResult =
+        builderConfig.runtime.desktop.profile === "system-proxy" &&
+        builderConfig.runtime.desktop.watchdog.enabled
+          ? await installRuntimeWatchdogAgent({
+              configPath,
+              cliEntrypoint: resolveCliEntrypoint(import.meta.url),
+              intervalSeconds: builderConfig.runtime.desktop.watchdog.intervalSeconds,
+              label: watchdogLabel,
+              ...(options.launchAgentsDir
+                ? { launchAgentsDir: resolvePath(options.launchAgentsDir) }
+                : {}),
+              ...(options.logsDir ? { logsDir: resolvePath(options.logsDir) } : {}),
+              force: true,
+              load: options.load !== false,
+            })
+          : undefined;
 
       process.stdout.write(
         `${[
@@ -88,6 +133,12 @@ export function registerRestartCommand(program: Command): void {
           `Label: ${result.label}`,
           `Live config: ${builderConfig.output.livePath}`,
           `LaunchAgent: ${result.plistPath}`,
+          ...(watchdogResult
+            ? [
+                `Watchdog: ${watchdogResult.label}`,
+                `Watchdog LaunchAgent: ${watchdogResult.plistPath}`,
+              ]
+            : []),
         ].join("\n")}\n`,
       );
     });

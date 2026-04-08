@@ -9,6 +9,7 @@ import { registerApplyCommand } from "./commands/apply.js";
 import { registerAuthorCommand } from "./commands/author.js";
 import { registerBuildCommand } from "./commands/build.js";
 import { registerCheckCommand } from "./commands/check.js";
+import { registerDiagnoseCommand } from "./commands/diagnose.js";
 import { registerDoctorCommand } from "./commands/doctor.js";
 import { registerGoCommand } from "./commands/go.js";
 import { registerHistoryCommand } from "./commands/history.js";
@@ -19,6 +20,7 @@ import { registerReloadCommand } from "./commands/reload.js";
 import { registerRestartCommand } from "./commands/restart.js";
 import { registerRollbackCommand } from "./commands/rollback.js";
 import { registerRunCommand } from "./commands/run.js";
+import { registerRuntimeWatchdogCommand } from "./commands/runtime-watchdog.js";
 import { registerScheduleCommand } from "./commands/schedule.js";
 import { registerSetupCommand } from "./commands/setup.js";
 import { registerStartCommand } from "./commands/start.js";
@@ -46,6 +48,7 @@ export function createProgram(): Command {
         "  singbox-iac update",
         "",
         "Health/debug:",
+        "  singbox-iac diagnose",
         "  singbox-iac status",
         "  singbox-iac start | stop | restart",
         "",
@@ -69,8 +72,10 @@ export function createProgram(): Command {
   registerApplyCommand(program);
   registerHistoryCommand(program);
   registerRunCommand(program);
+  registerRuntimeWatchdogCommand(program);
   registerRollbackCommand(program);
   registerVerifyCommand(program);
+  registerDiagnoseCommand(program);
   registerDoctorCommand(program);
   registerProxifierCommand(program);
   registerReloadCommand(program);
@@ -108,8 +113,10 @@ function hideAdvancedCommands(program: Command): void {
     "apply",
     "history",
     "run",
+    "runtime-watchdog",
     "rollback",
     "verify",
+    "diagnose",
     "doctor",
     "proxifier",
     "reload",

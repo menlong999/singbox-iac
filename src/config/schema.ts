@@ -81,11 +81,24 @@ const desktopTunRuntimeSchema = z
     addresses: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
   });
 
+const desktopRuntimeWatchdogSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    intervalSeconds: z.number().int().positive().default(60),
+    launchAgentLabel: z.string().min(1).default("org.singbox-iac.runtime.watchdog"),
+  })
+  .default({
+    enabled: true,
+    intervalSeconds: 60,
+    launchAgentLabel: "org.singbox-iac.runtime.watchdog",
+  });
+
 const desktopRuntimeSchema = z
   .object({
     profile: desktopRuntimeProfileSchema.default("system-proxy"),
     launchAgentLabel: z.string().min(1).default("org.singbox-iac.runtime"),
     tun: desktopTunRuntimeSchema,
+    watchdog: desktopRuntimeWatchdogSchema,
   })
   .default({
     profile: "system-proxy",
@@ -94,6 +107,11 @@ const desktopRuntimeSchema = z
       autoRoute: true,
       strictRoute: false,
       addresses: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+    },
+    watchdog: {
+      enabled: true,
+      intervalSeconds: 60,
+      launchAgentLabel: "org.singbox-iac.runtime.watchdog",
     },
   });
 

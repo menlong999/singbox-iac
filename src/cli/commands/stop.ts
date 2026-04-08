@@ -6,6 +6,10 @@ import {
   defaultRuntimeLaunchAgentLabel,
   removeDesktopRuntimeAgent,
 } from "../../modules/desktop-runtime/index.js";
+import {
+  defaultRuntimeWatchdogLaunchAgentLabel,
+  removeRuntimeWatchdogAgent,
+} from "../../modules/runtime-watchdog/index.js";
 import { resolveBuilderConfig } from "../command-helpers.js";
 
 export function registerStopCommand(program: Command): void {
@@ -18,6 +22,9 @@ export function registerStopCommand(program: Command): void {
     .option("--no-unload", "remove the LaunchAgent file without calling launchctl bootout")
     .action(async (options: StopCommandOptions) => {
       const builderConfig = await resolveBuilderConfig(options);
+      const watchdogLabel =
+        builderConfig?.runtime.desktop.watchdog.launchAgentLabel ??
+        defaultRuntimeWatchdogLaunchAgentLabel;
       const plistPath = await removeDesktopRuntimeAgent({
         label:
           options.label ??
@@ -28,8 +35,26 @@ export function registerStopCommand(program: Command): void {
           : {}),
         unload: options.unload !== false,
       });
+      const watchdogPlistPath =
+        builderConfig?.runtime.desktop.profile === "system-proxy" &&
+        builderConfig.runtime.desktop.watchdog.enabled
+          ? await removeRuntimeWatchdogAgent({
+              label: watchdogLabel,
+              ...(options.launchAgentsDir
+                ? { launchAgentsDir: resolvePath(options.launchAgentsDir) }
+                : {}),
+              unload: options.unload !== false,
+            })
+          : undefined;
 
-      process.stdout.write(`Stopped desktop runtime LaunchAgent: ${plistPath}\n`);
+      process.stdout.write(
+        `${[
+          `Stopped desktop runtime LaunchAgent: ${plistPath}`,
+          ...(watchdogPlistPath
+            ? [`Stopped runtime watchdog LaunchAgent: ${watchdogPlistPath}`]
+            : []),
+        ].join("\n")}\n`,
+      );
     });
 }
 
