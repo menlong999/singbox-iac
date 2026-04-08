@@ -5,6 +5,14 @@ import type { Command } from "commander";
 import { generateAuthoringPlan } from "../../modules/authoring/index.js";
 import { buildConfigArtifact, resolveEffectiveIntent } from "../../modules/build/index.js";
 import {
+  type AuthoringWriteMode,
+  applyLayeredAuthoringUpdate,
+  materializeLayeredAuthoringState,
+  resolveLayeredAuthoringPath,
+  resolveLayeredAuthoringState,
+  writeLayeredAuthoringState,
+} from "../../modules/layered-authoring/index.js";
+import {
   applyPlanToBuilderConfig,
   updateBuilderAuthoring,
   writeGeneratedRules,
@@ -81,16 +89,33 @@ export async function runAuthorFlow(options: AuthorCommandOptions): Promise<void
     ...(options.strict ? { strict: true } : {}),
   });
   const plan = planResult.plan;
+  const authoringMode = options.authoringMode ?? "replace";
   const rulesPath = options.rulesOut
     ? resolvePath(options.rulesOut)
     : builderConfig.rules.userRulesFile;
+  const currentLayeredState = await resolveLayeredAuthoringState({
+    config: builderConfig,
+  });
+  const nextLayeredState = applyLayeredAuthoringUpdate({
+    current: currentLayeredState.state,
+    prompt: options.prompt,
+    plan,
+    mode: authoringMode,
+    appliedAt: new Date().toISOString(),
+  });
+  const nextResolvedLayeredState = materializeLayeredAuthoringState({
+    filePath: resolveLayeredAuthoringPath(rulesPath),
+    exists: true,
+    state: nextLayeredState,
+  });
+  const mergedPlan = nextResolvedLayeredState.mergedPlan;
   const effectiveConfig = applyPlanToBuilderConfig(builderConfig, {
     rulesPath,
-    plan,
+    plan: mergedPlan,
   });
 
   if (options.emitIntentIr) {
-    process.stdout.write(`${JSON.stringify(planResult.intent, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(nextResolvedLayeredState.mergedIntent, null, 2)}\n`);
     return;
   }
 
@@ -99,10 +124,10 @@ export async function runAuthorFlow(options: AuthorCommandOptions): Promise<void
     const preview = await generateAuthoringPreview({
       configPath,
       config: builderConfig,
-      plan,
+      plan: mergedPlan,
       rulesPath,
       currentIntent,
-      proposedIntent: planResult.intent,
+      proposedIntent: nextResolvedLayeredState.mergedIntent,
       ...(options.subscriptionFile ? { subscriptionFile: options.subscriptionFile } : {}),
       ...(options.subscriptionUrl ? { subscriptionUrl: options.subscriptionUrl } : {}),
       buildStaging: !options.skipBuild,
@@ -111,19 +136,21 @@ export async function runAuthorFlow(options: AuthorCommandOptions): Promise<void
     const lines = [
       `Config: ${configPath}`,
       `Rules: ${rulesPath}`,
+      `Authoring mode: ${authoringMode}`,
+      `Layered authoring: ${nextResolvedLayeredState.filePath}`,
       `Provider requested: ${planResult.providerRequested}`,
       `Provider used: ${planResult.providerUsed}`,
-      `Templates: ${plan.templateIds.length > 0 ? plan.templateIds.join(", ") : "(none)"}`,
-      `Generated rules: ${plan.beforeBuiltins.length + plan.afterBuiltins.length}`,
+      `Templates: ${mergedPlan.templateIds.length > 0 ? mergedPlan.templateIds.join(", ") : "(none)"}`,
+      `Generated rules: ${mergedPlan.beforeBuiltins.length + mergedPlan.afterBuiltins.length}`,
       `${options.diff ? "Diff" : "Preview"} mode: no files were written.`,
     ];
     if (planResult.ambiguities.length > 0) {
       lines.push(`Ambiguities detected: ${planResult.ambiguities.length}`);
       lines.push(...planResult.ambiguities.map((ambiguity) => `- ${ambiguity}`));
     }
-    if (plan.notes.length > 0) {
-      lines.push(`Notes: ${plan.notes.length}`);
-      lines.push(...plan.notes.map((note) => `- ${note}`));
+    if (mergedPlan.notes.length > 0) {
+      lines.push(`Notes: ${mergedPlan.notes.length}`);
+      lines.push(...mergedPlan.notes.map((note) => `- ${note}`));
     }
     if (options.installSchedule) {
       lines.push("Schedule install: requested, but skipped in preview mode.");
@@ -152,36 +179,46 @@ export async function runAuthorFlow(options: AuthorCommandOptions): Promise<void
 
   await writeGeneratedRules({
     filePath: rulesPath,
-    plan,
+    plan: mergedPlan,
+  });
+  await writeLayeredAuthoringState({
+    rulesPath,
+    state: nextLayeredState,
   });
   await updateBuilderAuthoring({
     configPath,
     rulesPath,
-    ...(plan.scheduleIntervalMinutes ? { intervalMinutes: plan.scheduleIntervalMinutes } : {}),
-    ...(plan.groupDefaults ? { groupDefaults: plan.groupDefaults } : {}),
-    ...(plan.verificationOverrides ? { verificationOverrides: plan.verificationOverrides } : {}),
+    ...(mergedPlan.scheduleIntervalMinutes
+      ? { intervalMinutes: mergedPlan.scheduleIntervalMinutes }
+      : {}),
+    ...(mergedPlan.groupDefaults ? { groupDefaults: mergedPlan.groupDefaults } : {}),
+    ...(mergedPlan.verificationOverrides
+      ? { verificationOverrides: mergedPlan.verificationOverrides }
+      : {}),
   });
 
   const lines = [
     `Config: ${configPath}`,
     `Rules: ${rulesPath}`,
+    `Authoring mode: ${authoringMode}`,
+    `Layered authoring: ${nextResolvedLayeredState.filePath}`,
     `Provider requested: ${planResult.providerRequested}`,
     `Provider used: ${planResult.providerUsed}`,
-    `Templates: ${plan.templateIds.length > 0 ? plan.templateIds.join(", ") : "(none)"}`,
-    `Generated rules: ${plan.beforeBuiltins.length + plan.afterBuiltins.length}`,
+    `Templates: ${mergedPlan.templateIds.length > 0 ? mergedPlan.templateIds.join(", ") : "(none)"}`,
+    `Generated rules: ${mergedPlan.beforeBuiltins.length + mergedPlan.afterBuiltins.length}`,
   ];
   if (planResult.ambiguities.length > 0) {
     lines.push(`Ambiguities detected: ${planResult.ambiguities.length}`);
     lines.push(...planResult.ambiguities.map((ambiguity) => `- ${ambiguity}`));
   }
-  if (plan.notes.length > 0) {
-    lines.push(`Notes: ${plan.notes.length}`);
-    lines.push(...plan.notes.map((note) => `- ${note}`));
+  if (mergedPlan.notes.length > 0) {
+    lines.push(`Notes: ${mergedPlan.notes.length}`);
+    lines.push(...mergedPlan.notes.map((note) => `- ${note}`));
   }
 
   if (options.installSchedule) {
     const intervalMinutes =
-      plan.scheduleIntervalMinutes ?? effectiveConfig.schedule.intervalMinutes;
+      mergedPlan.scheduleIntervalMinutes ?? effectiveConfig.schedule.intervalMinutes;
 
     const schedule = await installLaunchdSchedule({
       configPath,
@@ -271,6 +308,7 @@ interface AuthorCommandOptions {
   readonly logsDir?: string;
   readonly forceSchedule?: boolean;
   readonly load?: boolean;
+  readonly authoringMode?: AuthoringWriteMode;
 }
 
 function resolvePath(filePath: string): string {

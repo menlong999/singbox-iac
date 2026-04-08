@@ -11,6 +11,24 @@ The `author` command is the bridge between a short routing prompt and the full l
 
 The output still goes through the normal compiler pipeline. Natural language does not mutate `sing-box` JSON directly.
 
+## Layered Authoring Semantics
+
+There are now two user-facing authoring modes:
+
+- `use '<prompt>'`
+  Patch the current authored policy set by default. A new prompt should preserve unrelated earlier intent.
+- `use '<prompt>' --replace`
+  Explicitly rebuild the authored policy set from this prompt.
+- `author --prompt '<prompt>'`
+  Remains the advanced authoring entrypoint and still behaves like an explicit replacement unless a caller opts into patch mode internally.
+
+Internally, the workflow now keeps two artifacts next to each other:
+
+- the generated YAML DSL at `rules.userRulesFile`
+- a sibling `*.authoring.yaml` file that stores the stable layered authored state
+
+The compiler still consumes the merged result. The layered state exists so `use` can remain additive over time without losing earlier authoring intent.
+
 ## Provider Modes
 
 The authoring layer supports four provider modes:
@@ -51,6 +69,21 @@ Generate rules and build a staging config:
 ./node_modules/.bin/tsx src/cli/index.ts author \
   --config ./builder.config.local.yaml \
   --prompt "开发者网站走香港，视频网站走新加坡"
+```
+
+Patch the existing authored policy with one sentence:
+
+```bash
+./node_modules/.bin/tsx src/cli/index.ts use \
+  'Gemini 走新加坡'
+```
+
+Force a full replacement instead of patching:
+
+```bash
+./node_modules/.bin/tsx src/cli/index.ts use \
+  'Google 服务和 GitHub 都走新加坡' \
+  --replace
 ```
 
 Preview what would change without writing files:
@@ -166,6 +199,8 @@ Natural language produces three things:
 - optional selector default changes
 - optional verification expectation overrides
 
+When layered authoring is active, those prompt outputs are merged with the current authored base before the DSL and builder config are rewritten.
+
 The command then updates:
 
 - `rules.userRulesFile`
@@ -173,6 +208,8 @@ The command then updates:
 - `schedule.intervalMinutes`
 - selector defaults such as `AI-Out`, `Dev-Common-Out`, or `Process-Proxy`
 - verification scenario expectations when an existing scenario’s target intent changed
+
+and, when using natural-language authoring, also persists a sibling `*.authoring.yaml` state file so future `use` calls can patch instead of replacing the whole authored policy set.
 
 and writes a new staging config.
 

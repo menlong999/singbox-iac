@@ -13,6 +13,13 @@ import { buildConfigArtifact, resolveEffectiveIntent } from "../../modules/build
 import { updateBuilderDesktopRuntime } from "../../modules/desktop-runtime/index.js";
 import { runDoctor } from "../../modules/doctor/index.js";
 import { initWorkspace } from "../../modules/init/index.js";
+import {
+  applyLayeredAuthoringUpdate,
+  materializeLayeredAuthoringState,
+  resolveLayeredAuthoringPath,
+  resolveLayeredAuthoringState,
+  writeLayeredAuthoringState,
+} from "../../modules/layered-authoring/index.js";
 import { applyConfig, checkConfig, resolveSingBoxBinary } from "../../modules/manager/index.js";
 import {
   applyPlanToBuilderConfig,
@@ -163,25 +170,46 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
       ...(options.execCommand ? { execCommand: options.execCommand } : {}),
       ...(options.execArg.length > 0 ? { execArgs: options.execArg } : {}),
     });
+    const currentLayeredState = await resolveLayeredAuthoringState({
+      config: builderConfig,
+    });
+    const nextLayeredState = applyLayeredAuthoringUpdate({
+      current: currentLayeredState.state,
+      prompt: options.prompt,
+      plan: planResult.plan,
+      mode: "replace",
+      appliedAt: new Date().toISOString(),
+    });
+    const nextResolvedLayeredState = materializeLayeredAuthoringState({
+      filePath: resolveLayeredAuthoringPath(builderConfig.rules.userRulesFile),
+      exists: true,
+      state: nextLayeredState,
+    });
 
     effectiveConfig = applyPlanToBuilderConfig(builderConfig, {
       rulesPath: builderConfig.rules.userRulesFile,
-      plan: planResult.plan,
+      plan: nextResolvedLayeredState.mergedPlan,
     });
 
     await writeGeneratedRules({
       filePath: effectiveConfig.rules.userRulesFile,
-      plan: planResult.plan,
+      plan: nextResolvedLayeredState.mergedPlan,
+    });
+    await writeLayeredAuthoringState({
+      rulesPath: effectiveConfig.rules.userRulesFile,
+      state: nextLayeredState,
     });
     await updateBuilderAuthoring({
       configPath,
       rulesPath: effectiveConfig.rules.userRulesFile,
-      ...(planResult.plan.scheduleIntervalMinutes
-        ? { intervalMinutes: planResult.plan.scheduleIntervalMinutes }
+      ...(nextResolvedLayeredState.mergedPlan.scheduleIntervalMinutes
+        ? { intervalMinutes: nextResolvedLayeredState.mergedPlan.scheduleIntervalMinutes }
         : {}),
-      ...(planResult.plan.groupDefaults ? { groupDefaults: planResult.plan.groupDefaults } : {}),
-      ...(planResult.plan.verificationOverrides
-        ? { verificationOverrides: planResult.plan.verificationOverrides }
+      ...(nextResolvedLayeredState.mergedPlan.groupDefaults
+        ? { groupDefaults: nextResolvedLayeredState.mergedPlan.groupDefaults }
+        : {}),
+      ...(nextResolvedLayeredState.mergedPlan.verificationOverrides
+        ? { verificationOverrides: nextResolvedLayeredState.mergedPlan.verificationOverrides }
         : {}),
     });
     builderConfig = await loadConfig(configPath);
@@ -189,12 +217,14 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
     planSummary = {
       providerRequested: planResult.providerRequested,
       providerUsed: planResult.providerUsed,
-      templates: planResult.plan.templateIds,
-      generatedRules: planResult.plan.beforeBuiltins.length + planResult.plan.afterBuiltins.length,
-      notes: planResult.plan.notes,
-      intent: planResult.intent,
+      templates: nextResolvedLayeredState.mergedPlan.templateIds,
+      generatedRules:
+        nextResolvedLayeredState.mergedPlan.beforeBuiltins.length +
+        nextResolvedLayeredState.mergedPlan.afterBuiltins.length,
+      notes: nextResolvedLayeredState.mergedPlan.notes,
+      intent: nextResolvedLayeredState.mergedIntent,
       ambiguities: planResult.ambiguities,
-      groupDefaults: planResult.plan.groupDefaults ?? {},
+      groupDefaults: nextResolvedLayeredState.mergedPlan.groupDefaults ?? {},
     };
   }
 

@@ -5,9 +5,10 @@ import { runAuthorFlow } from "./author.js";
 export function registerUseCommand(program: Command): void {
   const command = program
     .command("use")
-    .description("Change routing policy with one sentence and apply it.")
+    .description("Patch routing policy with one sentence and apply it.")
     .argument("<prompt>", "one-sentence routing intent")
     .option("-c, --config <path>", "path to builder config YAML")
+    .option("--replace", "replace the authored policy set instead of patching it")
     .option("--preview", "print diffs without writing any files")
     .option("--diff", "print Intent IR and config diffs without writing any files")
     .option("--emit-intent-ir", "print the generated Intent IR and exit without writing files")
@@ -24,6 +25,7 @@ export function registerUseCommand(program: Command): void {
         prompt: string,
         options: {
           readonly config?: string;
+          readonly replace?: boolean;
           readonly preview?: boolean;
           readonly diff?: boolean;
           readonly emitIntentIr?: boolean;
@@ -42,6 +44,7 @@ export function registerUseCommand(program: Command): void {
           execArg: [],
           label: "org.singbox-iac.update",
           ...(options.config ? { config: options.config } : {}),
+          authoringMode: options.replace ? "replace" : "patch",
           ...(options.preview ? { preview: true } : {}),
           ...(options.diff ? { diff: true } : {}),
           ...(options.emitIntentIr ? { emitIntentIr: true } : {}),

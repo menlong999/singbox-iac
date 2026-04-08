@@ -17,6 +17,8 @@ Allow users to customize routing intent with a compact YAML DSL instead of raw s
 - The generic exec adapter must support prompt/schema/context placeholders, schema and output temp files, and extraction of a JSON plan from noisy text output.
 - Natural-language authoring should support intent-first developer sentences without requiring users to understand the DSL or internal selector names.
 - Natural-language authoring may update selector defaults and verification expectations when a prompt expresses category-level or scenario-specific routing intent.
+- Natural-language authoring must persist a stable layered authoring state separate from the generated DSL so additive prompt updates can preserve earlier intent.
+- The layered authoring state may store prompt-derived authoring plans, but it must still produce a merged effective intent for preview, build, verification, and status flows.
 - The DSL must support common matchers:
   - `inbound`
   - `protocol`
@@ -32,6 +34,8 @@ Allow users to customize routing intent with a compact YAML DSL instead of raw s
 - Missing user-rules files must not fail the build; they should surface as warnings.
 - User rules must not be able to insert ahead of protected system invariants.
 - Natural-language authoring may update the builder config to point at the generated rules file and to set schedule metadata.
+- Everyday `use` flows must default to patch semantics so a new prompt augments or overrides relevant intent without erasing unrelated prior authoring.
+- `use --replace` must remain available for explicit full replacement of the authored policy set.
 - Schedule installation must remain an explicit action even when a prompt contains interval language.
 - Local AI CLI integrations must be bounded to DSL-plan generation and must not write raw sing-box JSON directly.
 

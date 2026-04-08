@@ -29,6 +29,8 @@ Provide a user-friendly command-line interface for initialization, build, apply,
 
 - `go` must provide the shortest first-run onboarding path by accepting a subscription URL and one routing sentence as positional arguments.
 - `use` must provide the shortest everyday rule-change path by accepting one routing sentence and applying it without forcing the user to understand DSL syntax.
+- `use` must default to patch semantics and preserve unrelated prior authored intent unless the user explicitly asks for replacement.
+- `use --replace` must perform an explicit full replacement of the authored policy set.
 - `update` should auto-reload a running `sing-box` process when the configured reload target is already active.
 - The CLI help output should make it clear that most users only need `go`, `use`, and `update`, while health/debug commands remain easy to discover and power-user commands do not dominate the first screen.
 - `init` must generate example configuration assets for the user.

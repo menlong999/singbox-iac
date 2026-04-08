@@ -7,8 +7,9 @@ import type { IntentIR } from "../../domain/intent.js";
 import { compileConfig } from "../compiler/index.js";
 import { fetchSubscription } from "../fetcher/index.js";
 import { createEmptyIntent, intentFromUserRules, mergeIntents } from "../intent/index.js";
+import { resolveLayeredAuthoringState } from "../layered-authoring/index.js";
 import { parseSubscription } from "../parser/index.js";
-import { loadUserRules } from "../user-rules/index.js";
+import { type LoadedUserRules, loadUserRules } from "../user-rules/index.js";
 
 export interface BuildConfigInput {
   readonly config: BuilderConfig;
@@ -31,7 +32,7 @@ export async function buildConfigArtifact(input: BuildConfigInput): Promise<Buil
   }
 
   const loadedUserRules = await loadUserRules(input.config.rules.userRulesFile);
-  const intent = mergeIntents([createEmptyIntent(), intentFromUserRules(loadedUserRules)]);
+  const intent = await resolveEffectiveIntent(input.config, { loadedUserRules });
   const artifact = compileConfig({
     nodes: parsed.nodes,
     config: input.config,
@@ -51,9 +52,28 @@ export async function buildConfigArtifact(input: BuildConfigInput): Promise<Buil
   };
 }
 
-export async function resolveEffectiveIntent(config: BuilderConfig): Promise<IntentIR> {
-  const loadedUserRules = await loadUserRules(config.rules.userRulesFile);
-  return mergeIntents([createEmptyIntent(), intentFromUserRules(loadedUserRules)]);
+export async function resolveEffectiveIntent(
+  config: BuilderConfig,
+  input?: {
+    readonly loadedUserRules?: LoadedUserRules;
+  },
+): Promise<IntentIR> {
+  const loadedUserRules =
+    input?.loadedUserRules ?? (await loadUserRules(config.rules.userRulesFile));
+  const layeredState = await resolveLayeredAuthoringState({
+    config,
+    loadedUserRules,
+  });
+  const layeredIntent = layeredState.mergedIntent;
+
+  return mergeIntents([
+    createEmptyIntent(),
+    {
+      ...layeredIntent,
+      sitePolicies: [],
+    },
+    intentFromUserRules(loadedUserRules),
+  ]);
 }
 
 async function resolveSubscriptionInput(input: BuildConfigInput): Promise<string> {

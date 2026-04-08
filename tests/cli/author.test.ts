@@ -3,8 +3,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import YAML from "yaml";
 
+import { runAuthorFlow } from "../../src/cli/commands/author.js";
 import { createProgram } from "../../src/cli/index.js";
+import { resolveLayeredAuthoringPath } from "../../src/modules/layered-authoring/index.js";
 
 const fixturePath = path.resolve(process.cwd(), "tests/fixtures/subscriptions/trojan-sample.b64");
 
@@ -335,6 +338,132 @@ authoring:
     expect(readFileSync(configPath, "utf8")).toBe(originalConfig);
     expect(readFileSync(rulesPath, "utf8")).toBe(originalRules);
     expect(existsSync(stagingPath)).toBe(false);
+  });
+
+  it("supports additive patch semantics and explicit replacement for layered authoring", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "singbox-iac-author-layered-"));
+    tempDirs.push(dir);
+
+    const configPath = path.join(dir, "builder.config.yaml");
+    const rulesPath = path.join(dir, "custom.rules.yaml");
+    const layeredPath = resolveLayeredAuthoringPath(rulesPath);
+
+    writeFileSync(
+      rulesPath,
+      `version: 1
+beforeBuiltins:
+  - name: "OpenRouter uses HK"
+    domainSuffix: ["openrouter.ai"]
+    route: "HK"
+afterBuiltins: []
+`,
+    );
+    writeFileSync(
+      configPath,
+      `version: 1
+subscription:
+  url: "https://example.com/subscription"
+  format: "base64-lines"
+  protocols:
+    - trojan
+output:
+  stagingPath: "${path.join(dir, "staging.json")}"
+  livePath: "${path.join(dir, "live.json")}"
+  backupPath: "${path.join(dir, "backup.json")}"
+runtime:
+  checkCommand: "sing-box check -c {{stagingPath}}"
+  reload:
+    kind: "signal"
+    processName: "sing-box"
+    signal: "HUP"
+listeners:
+  mixed:
+    enabled: true
+    listen: "127.0.0.1"
+    port: 39097
+  proxifier:
+    enabled: true
+    listen: "127.0.0.1"
+    port: 39091
+ruleSets: []
+groups:
+  processProxy:
+    type: "selector"
+    includes: ["US"]
+  aiOut:
+    type: "selector"
+    includes: ["HK", "US", "SG"]
+    defaultTarget: "HK"
+  devCommonOut:
+    type: "selector"
+    includes: ["HK", "US"]
+    defaultTarget: "HK"
+  stitchOut:
+    type: "selector"
+    includes: ["US"]
+    defaultTarget: "US"
+  global:
+    type: "urltest"
+    includes: ["HK", "US"]
+rules:
+  userRulesFile: "${rulesPath}"
+verification:
+  scenarios:
+    - id: "chatgpt-hk"
+      name: "ChatGPT uses the HK default AI path"
+      url: "https://chatgpt.com/favicon.ico"
+      inbound: "in-mixed"
+      expectedOutbound: "AI-Out"
+schedule:
+  enabled: false
+  intervalMinutes: 30
+authoring:
+  provider: "deterministic"
+  timeoutMs: 4000
+`,
+    );
+
+    await runAuthorFlow({
+      config: configPath,
+      prompt: "Gemini 走新加坡",
+      execArg: [],
+      label: "org.singbox-iac.author-layered",
+      skipBuild: true,
+      authoringMode: "patch",
+    });
+
+    const patchedRules = readFileSync(rulesPath, "utf8");
+    const patchedState = YAML.parse(readFileSync(layeredPath, "utf8")) as {
+      base: { plan: { beforeBuiltins: Array<{ domainSuffix?: string[] }> } };
+      patches: Array<{ plan: { beforeBuiltins: Array<{ domainSuffix?: string[] }> } }>;
+    };
+    expect(patchedRules).toContain("openrouter.ai");
+    expect(patchedRules).toContain("gemini.google.com");
+    expect(patchedState.base.plan.beforeBuiltins[0]?.domainSuffix).toContain("openrouter.ai");
+    expect(patchedState.patches).toHaveLength(1);
+    expect(patchedState.patches[0]?.plan.beforeBuiltins[0]?.domainSuffix).toContain(
+      "gemini.google.com",
+    );
+
+    await runAuthorFlow({
+      config: configPath,
+      prompt: "Perplexity 走美国",
+      execArg: [],
+      label: "org.singbox-iac.author-layered",
+      skipBuild: true,
+      authoringMode: "replace",
+    });
+
+    const replacedRules = readFileSync(rulesPath, "utf8");
+    const replacedState = YAML.parse(readFileSync(layeredPath, "utf8")) as {
+      base: { prompt?: string };
+      patches: unknown[];
+    };
+    expect(replacedRules).toContain("perplexity.ai");
+    expect(replacedRules).not.toContain("openrouter.ai");
+    expect(replacedRules).not.toContain("gemini.google.com");
+    expect(replacedState.base.prompt).toBe("Perplexity 走美国");
+    expect(replacedState.patches).toHaveLength(0);
   });
 
   it("can run build and publish directly from author with --update", async () => {
