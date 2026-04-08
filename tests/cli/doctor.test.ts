@@ -108,9 +108,16 @@ schedule:
     ]);
 
     const output = writeSpy.mock.calls.map((call) => String(call[0])).join("");
+    expect(output).toContain(
+      "Readiness check: environment and config prerequisites for singbox-iac.",
+    );
+    expect(output).toContain("Context:");
+    expect(output).toContain("Checks:");
+    expect(output).toContain("Result:");
     expect(output).toContain("[PASS] sing-box:");
     expect(output).toContain("[PASS] chrome:");
     expect(output).toContain("[PASS] builder-config:");
+    expect(output).toContain("blocking-failures: no");
     const renderedConfig = readFileSync(configPath, "utf8");
     expect(renderedConfig).toContain(`singBoxBinary: ${fakeSingBox}`);
     expect(renderedConfig).toContain(`chromeBinary: ${fakeChrome}`);

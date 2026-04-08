@@ -146,15 +146,19 @@ authoring:
     ]);
 
     const output = writeSpy.mock.calls.map((call) => String(call[0])).join("");
-    expect(output).toContain("Binary:");
-    expect(output).toContain(fakeSingBox);
-    expect(output).toContain("Desktop runtime:");
-    expect(output).toContain("Live config:");
-    expect(output).toContain(livePath);
-    expect(output).toContain("Schedule:");
-    expect(output).toContain(label);
-    expect(output).toContain("Transactions:");
-    expect(output).toContain("tx-123");
+    expect(output).toContain(
+      "Runtime snapshot: current sing-box, proxy, schedule, and recent publish state.",
+    );
+    expect(output).toContain("Context:");
+    expect(output).toContain("Summary:");
+    expect(output).toContain("Runtime:");
+    expect(output).toContain("Config & Schedule:");
+    expect(output).toContain("Recent Publish:");
+    expect(output).toContain("Diagnostics:");
+    expect(output).toContain(`binary: ${fakeSingBox}`);
+    expect(output).toContain(`live-config: ${livePath} [present]`);
+    expect(output).toContain(`schedule: ${label} installed=true`);
+    expect(output).toContain("latest-transaction: tx-123");
   });
 
   it("prints machine-readable JSON output", async () => {

@@ -24,12 +24,12 @@ Typical files:
 
 ## Fast Path
 
-If your first-run prompt mentions `Proxifier`, `进程级`, `Antigravity`, `Cursor`, or similar process-aware intent, both `quickstart` and `setup --ready` will generate the helper directory automatically.
+If your first-run prompt mentions `Proxifier`, `进程级`, `Antigravity`, `Cursor`, or similar process-aware intent, both `go` and `setup --ready` will generate the helper directory automatically.
 
 ```bash
-singbox-iac quickstart \
-  --subscription-url '<url>' \
-  --prompt 'Antigravity 进程级走美国，GitHub 走香港，国内直连'
+singbox-iac go \
+  '<url>' \
+  'Antigravity 进程级走美国，GitHub 走香港，国内直连'
 ```
 
 ## Manual Regeneration

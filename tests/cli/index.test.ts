@@ -48,7 +48,8 @@ describe("cli entrypoint detection", () => {
 
 describe("cli help", () => {
   it("surfaces the streamlined everyday commands and hides advanced commands from the default help", () => {
-    const help = createProgram().helpInformation();
+    const program = createProgram();
+    const help = program.helpInformation();
 
     expect(help).toContain("go");
     expect(help).toContain("use");
@@ -57,5 +58,6 @@ describe("cli help", () => {
     expect(help).not.toContain("setup");
     expect(help).not.toContain("author");
     expect(help).not.toContain("build [options]");
+    expect(program.commands.find((command) => command.name() === "quickstart")).toBeUndefined();
   });
 });

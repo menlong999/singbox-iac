@@ -15,7 +15,6 @@ import { registerGoCommand } from "./commands/go.js";
 import { registerHistoryCommand } from "./commands/history.js";
 import { registerInitCommand } from "./commands/init.js";
 import { registerProxifierCommand } from "./commands/proxifier.js";
-import { registerQuickstartCommand } from "./commands/quickstart.js";
 import { registerReloadCommand } from "./commands/reload.js";
 import { registerRestartCommand } from "./commands/restart.js";
 import { registerRollbackCommand } from "./commands/rollback.js";
@@ -48,11 +47,12 @@ export function createProgram(): Command {
         "  singbox-iac update",
         "",
         "Health/debug:",
+        "  singbox-iac doctor",
         "  singbox-iac diagnose",
         "  singbox-iac status",
         "  singbox-iac start | stop | restart",
         "",
-        "Advanced commands: quickstart, setup, author, build, verify, proxifier, schedule",
+        "Power-user commands remain available via `singbox-iac help <command>` and the docs.",
       ].join("\n"),
     );
 
@@ -65,7 +65,6 @@ export function createProgram(): Command {
   registerStartCommand(program);
   registerStopCommand(program);
   registerRestartCommand(program);
-  registerQuickstartCommand(program);
   registerAuthorCommand(program);
   registerBuildCommand(program);
   registerCheckCommand(program);
@@ -106,7 +105,6 @@ function hideAdvancedCommands(program: Command): void {
     "start",
     "stop",
     "restart",
-    "quickstart",
     "author",
     "build",
     "check",

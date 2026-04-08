@@ -29,10 +29,18 @@ describe("diagnose command", () => {
     await createProgram().parseAsync(["node", "singbox-iac", "diagnose"]);
 
     const output = writeSpy.mock.calls.map((call) => String(call[0])).join("");
-    expect(output).toContain("Summary: PASS 8 WARN 0 FAIL 0");
+    expect(output).toContain(
+      "Network triage: runtime summary plus local route, DNS, and domain-resolution evidence.",
+    );
+    expect(output).toContain("Summary:");
+    expect(output).toContain("checks: PASS 8 WARN 0 FAIL 0");
+    expect(output).toContain("assessment: No immediate network issue detected.");
+    expect(output).toContain("Runtime Summary:");
     expect(output).toContain("[PASS] runtime-process: running (22608)");
+    expect(output).toContain("Network Evidence:");
     expect(output).toContain("[PASS] default-route: interface=en0, gateway=192.168.31.1");
-    expect(output).toContain("Status diagnostics:");
+    expect(output).toContain("Suggested Next Step:");
+    expect(output).toContain("Status Diagnostics:");
     expect(output).toContain("No status diagnostics were recorded");
   });
 
@@ -43,9 +51,13 @@ describe("diagnose command", () => {
     await createProgram().parseAsync(["node", "singbox-iac", "diagnose"]);
 
     const output = writeSpy.mock.calls.map((call) => String(call[0])).join("");
-    expect(output).toContain("Summary: PASS 2 WARN 4 FAIL 0");
+    expect(output).toContain("checks: PASS 2 WARN 4 FAIL 0");
+    expect(output).toContain("assessment: Mixed evidence across runtime and local network.");
+    expect(output).toContain("Runtime Summary:");
     expect(output).toContain("[WARN] system-proxy:");
+    expect(output).toContain("Network Evidence:");
     expect(output).toContain("[WARN] dns-probe:chatgpt.com:");
+    expect(output).toContain("Suggested Next Step:");
     expect(output).toContain("[warn] Desktop runtime is running in system-proxy mode");
   });
 });

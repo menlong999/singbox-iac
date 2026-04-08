@@ -41,16 +41,19 @@ describe("status command drift output", () => {
     await createProgram().parseAsync(["node", "singbox-iac", "status", "--config", configPath]);
 
     const output = writeSpy.mock.calls.map((call) => String(call[0])).join("");
-    expect(output).toContain("System proxy: state=endpoint-mismatch drift=true");
+    expect(output).toContain("Summary:");
+    expect(output).toContain("proxy: state=endpoint-mismatch, drift=true");
+    expect(output).toContain("Runtime:");
+    expect(output).toContain("system-proxy: state=endpoint-mismatch drift=true");
     expect(output).toContain("expected=127.0.0.1:39097");
     expect(output).toContain("actual=http=127.0.0.1:8888, socks=127.0.0.1:39097");
-    expect(output).toContain("Proxy hint: Run `singbox-iac restart`");
-    expect(output).toContain("Watchdog: enabled=true");
+    expect(output).toContain("proxy-hint: Run `singbox-iac restart`");
+    expect(output).toContain("watchdog: enabled=true");
     expect(output).toContain("interval=60s");
     expect(output).toContain("last-result=reasserted");
     expect(output).toContain("last-action=reassert-proxy");
     expect(output).toContain("last-trigger=proxy-drift");
-    expect(output).toContain("Watchdog message: Reasserted the macOS system proxy");
+    expect(output).toContain("watchdog-message: Reasserted the macOS system proxy");
   });
 });
 

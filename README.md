@@ -62,7 +62,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    A["用户提供订阅地址 + 一句话需求"] --> B["quickstart / setup --ready"]
+    A["用户提供订阅地址 + 一句话需求"] --> B["go"]
     B --> C["检测本地环境<br/>macOS / sing-box / Chrome / AI CLI"]
     C --> D["根据意图生成规则"]
     D --> E["同步本地 rule set"]
@@ -198,19 +198,19 @@ singbox-iac diagnose
 
 `status` 适合看当前运行快照；`diagnose` 适合继续判断问题更像是运行时漂移、系统 DNS/默认路由异常，还是最近一次发布没有生效。
 
-其余命令都可以理解为高级命令，主要用于调试、排障或更细粒度控制。
+其余命令都属于 power-user / 工程命令，主要用于拆流程、排障或更细粒度控制。
 
 `RuntimeMode` 是内部概念，不要求用户手动选择。当前 onboarding 和 `update` 会自动推断 `browser-proxy`、`process-proxy` 或 `headless-daemon`，并据此调整可见验证和运行时默认行为。详见 [docs/runtime-modes.md](./docs/runtime-modes.md)。
 
-### 一步完成初始化
+### 首次初始化的默认路径
 
 ```bash
-singbox-iac quickstart \
-  --subscription-url '你的机场订阅地址' \
-  --prompt 'GitHub 这类开发类走香港，Antigravity 进程级走美国，Gemini 走新加坡，每30分钟自动更新'
+singbox-iac go \
+  '你的机场订阅地址' \
+  'GitHub 这类开发类走香港，Antigravity 进程级走美国，Gemini 走新加坡，每30分钟自动更新'
 ```
 
-`quickstart` 会自动：
+`go` 会自动：
 
 - 生成 `~/.config/singbox-iac/builder.config.yaml`
 - 生成 `~/.config/singbox-iac/rules/custom.rules.yaml`
@@ -223,7 +223,7 @@ singbox-iac quickstart \
 - 发布 live config
 - 安装定时更新
 
-如果你希望保留更细的步骤控制，也可以继续用：
+如果你希望保留更细的首启控制，再使用 power-user 的 `setup --ready`：
 
 ```bash
 singbox-iac setup \
@@ -231,11 +231,6 @@ singbox-iac setup \
   --prompt 'GitHub 这类开发类走香港，Antigravity 进程级走美国，Gemini 走新加坡，每30分钟自动更新' \
   --ready
 ```
-
-`setup --ready` 和 `quickstart` 的主要区别是：
-
-- `quickstart` 更偏默认的一键上手
-- `setup --ready` 更适合你还想自己决定是否运行、是否开浏览器、是否写 Proxifier 辅助目录
 
 ### 前台运行测试
 
@@ -299,14 +294,7 @@ singbox-iac use 'GitHub 这类开发类都走香港，Gemini 走新加坡'
 示例：
 
 ```bash
-singbox-iac author \
-  --prompt 'GitHub 这类开发类都走香港出口，Antigravity 进程级都走独立入口并路由到美国节点，Gemini 都出口到新加坡'
-```
-
-```bash
-singbox-iac author \
-  --prompt 'Google 服务和 GitHub 走香港，Amazon Prime 和 Apple TV 走新加坡，国内直连，每45分钟自动更新' \
-  --update
+singbox-iac use 'Google 服务和 GitHub 走香港，Amazon Prime 和 Apple TV 走新加坡，国内直连，每45分钟自动更新'
 ```
 
 作者层支持：
@@ -323,6 +311,8 @@ singbox-iac author \
 ```bash
 singbox-iac use 'GitHub 这类开发类都走香港，Gemini 走新加坡' --strict --diff
 ```
+
+如果你需要 preview、Intent IR、或分阶段 author/build/update 控制，再使用 power-user 的 `author`。详见 [docs/natural-language-authoring.md](./docs/natural-language-authoring.md)。
 
 ## Proxifier 上手
 
@@ -390,20 +380,19 @@ singbox-iac proxifier bundles render antigravity
 
 当前项目不会把订阅地址自动上传到任何远端服务。除非你主动配置外部 AI CLI 或外部命令，否则默认作者层不依赖外部 API。
 
-## 常用命令
+## Power-user / 工程命令
+
+除非你要拆开流水线、做深度排障或处理特殊集成，一般不需要直接用这些：
 
 ```bash
 singbox-iac init
 singbox-iac setup
-singbox-iac quickstart
 singbox-iac author
 singbox-iac build
 singbox-iac check
 singbox-iac apply
 singbox-iac run
 singbox-iac verify
-singbox-iac update
-singbox-iac doctor
 singbox-iac proxifier bundles
 singbox-iac proxifier bundles show antigravity
 singbox-iac proxifier bundles render antigravity

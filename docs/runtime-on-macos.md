@@ -31,13 +31,12 @@ singbox-iac status
 Advanced commands remain available for debugging or fine-grained control:
 
 ```bash
-singbox-iac quickstart
-singbox-iac setup
-singbox-iac author
+singbox-iac setup --ready
+singbox-iac author --prompt '<一句话需求>' --update
 singbox-iac build
 singbox-iac verify
+singbox-iac proxifier scaffold
 singbox-iac schedule install
-singbox-iac restart
 ```
 
 ## Desktop Runtime Profiles

@@ -11,7 +11,6 @@ Provide a user-friendly command-line interface for initialization, build, apply,
 - `update`
 - `init`
 - `setup`
-- `quickstart`
 - `author`
 - `build`
 - `check`
@@ -31,16 +30,15 @@ Provide a user-friendly command-line interface for initialization, build, apply,
 - `go` must provide the shortest first-run onboarding path by accepting a subscription URL and one routing sentence as positional arguments.
 - `use` must provide the shortest everyday rule-change path by accepting one routing sentence and applying it without forcing the user to understand DSL syntax.
 - `update` should auto-reload a running `sing-box` process when the configured reload target is already active.
-- The CLI help output should make it clear that most users only need `go`, `use`, and `update`, while the remaining commands are advanced controls.
+- The CLI help output should make it clear that most users only need `go`, `use`, and `update`, while health/debug commands remain easy to discover and power-user commands do not dominate the first screen.
 - `init` must generate example configuration assets for the user.
-- `setup` must provide a one-step first-run path that can initialize the default config, prepare rule sets, and build a staging config.
+- `setup` must provide a power-user first-run path that can initialize the default config, prepare rule sets, and build a staging config when the user wants more control than `go`.
 - `setup` should surface local environment readiness during onboarding unless the user explicitly skips it.
 - `setup` should be able to run a guided activation path that includes verification and publish steps after a successful first build.
 - `setup` should be able to continue into a foreground `sing-box` run after a successful onboarding flow.
 - `setup` should be able to open isolated visible browser windows for representative verification URLs without requiring the user to configure a browser manually.
 - `setup` should be able to narrow those visible verification URLs based on the user's natural-language routing prompt.
 - `setup` should be able to generate Proxifier helper assets when the onboarding prompt implies process-aware routing intent.
-- `quickstart` must provide the shortest opinionated first-run path for npm-installed users, including config initialization, rule authoring, verification, publish, and schedule installation.
 - `author` must support intent-first rule authoring without requiring the user to understand the DSL.
 - `author` must support preview-only operation.
 - `author` may optionally trigger a closed-loop update flow after writing rules.
