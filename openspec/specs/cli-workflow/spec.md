@@ -55,6 +55,7 @@ Provide a user-friendly command-line interface for initialization, build, apply,
 - `diagnose` must summarize runtime, listener, proxy, schedule, recent transaction, and best-effort DNS/network evidence in one command.
 - `diagnose` should help distinguish local environment failures from runtime drift without claiming root cause with certainty.
 - `proxifier bundles` must enumerate the supported process presets that can help users build Proxifier rules.
+- `proxifier bundles` should expose maintained bundle metadata for common developer and AI tools instead of relying on ad-hoc docs-only process lists.
 - `proxifier scaffold` must generate a helper directory from the configured `in-proxifier` listener and optional prompt-derived process bundles.
 - Example and fallback listener defaults should avoid common Clash-family local ports to support side-by-side testing on macOS.
 - The distributed CLI package must be installable from an npm tarball with a working `singbox-iac` binary entrypoint.

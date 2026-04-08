@@ -4,6 +4,11 @@ import path from "node:path";
 import YAML from "yaml";
 
 import type { BuilderConfig } from "../../config/schema.js";
+import {
+  collectSiteBundleDomains,
+  selectProcessBundlesFromText,
+  selectSiteBundlesFromText,
+} from "../bundle-registry/index.js";
 import { mergeRuleTemplates } from "../rule-templates/index.js";
 import type { UserRouteRule } from "../user-rules/index.js";
 
@@ -46,40 +51,6 @@ export interface PromptSelectableVerificationScenario {
   readonly inbound: "in-mixed" | "in-proxifier";
   readonly expectedOutbound: string;
 }
-
-const siteAliasDefinitions = [
-  { aliases: ["openrouter"], domains: ["openrouter.ai"] },
-  { aliases: ["perplexity"], domains: ["perplexity.ai"] },
-  { aliases: ["chatgpt"], domains: ["chatgpt.com", "openai.com"] },
-  { aliases: ["openai"], domains: ["openai.com"] },
-  { aliases: ["gemini"], domains: ["gemini.google.com"] },
-  { aliases: ["anthropic", "claude"], domains: ["anthropic.com", "claude.ai"] },
-  { aliases: ["github"], domains: ["github.com", "githubusercontent.com"] },
-  {
-    aliases: ["google", "google 服务", "google services"],
-    domains: ["google.com", "googleapis.com", "gstatic.com", "googlevideo.com"],
-  },
-  {
-    aliases: ["apple", "icloud", "apple 服务", "apple services"],
-    domains: ["apple.com", "icloud.com", "mzstatic.com", "tv.apple.com"],
-  },
-  { aliases: ["google stitch", "stitch"], domains: ["stitch.withgoogle.com"] },
-  { aliases: ["google tv"], domains: ["tv.youtube.com"] },
-  { aliases: ["youtube"], domains: ["youtube.com", "youtu.be"] },
-  { aliases: ["netflix"], domains: ["netflix.com", "nflxvideo.net"] },
-  {
-    aliases: ["amazon prime", "prime video", "primevideo", "amazon video"],
-    domains: ["primevideo.com", "amazonvideo.com"],
-  },
-  {
-    aliases: ["disney+", "disney plus", "disneyplus"],
-    domains: ["disneyplus.com", "disney-plus.net"],
-  },
-  { aliases: ["bilibili", "b站"], domains: ["bilibili.com", "bilibili.tv"] },
-  { aliases: ["iqiyi", "爱奇艺"], domains: ["iqiyi.com", "iq.com"] },
-  { aliases: ["youku", "优酷"], domains: ["youku.com"] },
-  { aliases: ["mgtv", "芒果tv", "芒果"], domains: ["mgtv.com"] },
-];
 
 const categoryTemplateDefinitions = [
   {
@@ -130,7 +101,7 @@ const categoryTemplateDefinitions = [
   { aliases: ["国内视频网站", "cn video"], templateId: "cn-video-direct" },
 ];
 
-const processAliasDefinitions = [
+const genericProcessIntentDefinitions = [
   "proxifier",
   "进程级",
   "独立入口",
@@ -138,8 +109,6 @@ const processAliasDefinitions = [
   "process-level",
   "process level",
   "ide",
-  "antigravity",
-  "google antigravity",
 ];
 
 const ambiguousPhraseDefinitions = [
@@ -181,10 +150,14 @@ export function analyzePrompt(prompt: string): NaturalLanguagePromptAnalysis {
   for (const clause of clauses) {
     const route = extractRouteTarget(clause);
     const phase = route === "direct" ? "afterBuiltins" : "beforeBuiltins";
-    const hasProcessIntent = processAliasDefinitions.some((alias) => clause.includes(alias));
+    const matchedSiteBundles = selectSiteBundlesFromText(clause);
+    const matchedProcessBundles = selectProcessBundlesFromText(clause);
+    const hasProcessIntent =
+      genericProcessIntentDefinitions.some((alias) => clause.includes(alias)) ||
+      matchedProcessBundles.length > 0;
     const hasAiCategory = hasTemplateAlias(clause, "developer-ai-sites");
     const hasDeveloperCategory = hasTemplateAlias(clause, "developer-common-sites");
-    const hasStitchIntent = ["google stitch", "stitch"].some((alias) => clause.includes(alias));
+    const hasStitchIntent = matchedSiteBundles.some((bundle) => bundle.id === "google-stitch");
     const matchedDomains = new Set<string>();
     const explicitDomains = extractExplicitDomains(clause);
 
@@ -236,12 +209,8 @@ export function analyzePrompt(prompt: string): NaturalLanguagePromptAnalysis {
       }
     }
 
-    for (const definition of siteAliasDefinitions) {
-      if (definition.aliases.some((alias) => clause.includes(alias))) {
-        for (const domain of definition.domains) {
-          matchedDomains.add(domain);
-        }
-      }
+    for (const domain of collectSiteBundleDomains(matchedSiteBundles)) {
+      matchedDomains.add(domain);
     }
 
     for (const domain of explicitDomains) {
@@ -293,7 +262,11 @@ export function analyzePrompt(prompt: string): NaturalLanguagePromptAnalysis {
 
     if (hasProcessIntent) {
       notes.push(
-        `Prompt clause "${clause}" maps to the built-in proxifier flow. Use Proxifier to send the target apps to in-proxifier.`,
+        matchedProcessBundles.length > 0
+          ? `Prompt clause "${clause}" maps to built-in proxifier bundles: ${matchedProcessBundles
+              .map((bundle) => bundle.name)
+              .join(", ")}. Use Proxifier to send the target apps to in-proxifier.`
+          : `Prompt clause "${clause}" maps to the built-in proxifier flow. Use Proxifier to send the target apps to in-proxifier.`,
       );
     }
   }
@@ -324,20 +297,20 @@ export function selectVerificationScenariosForPrompt(
 
   for (const clause of clauses) {
     const requestedDomains = new Set<string>();
+    const matchedSiteBundles = selectSiteBundlesFromText(clause);
+    const matchedProcessBundles = selectProcessBundlesFromText(clause);
 
-    for (const definition of siteAliasDefinitions) {
-      if (definition.aliases.some((alias) => clause.includes(alias))) {
-        for (const domain of definition.domains) {
-          requestedDomains.add(domain);
-        }
-      }
+    for (const domain of collectSiteBundleDomains(matchedSiteBundles)) {
+      requestedDomains.add(domain);
     }
 
     for (const domain of extractExplicitDomains(clause)) {
       requestedDomains.add(domain);
     }
 
-    const wantsProcess = processAliasDefinitions.some((alias) => clause.includes(alias));
+    const wantsProcess =
+      genericProcessIntentDefinitions.some((alias) => clause.includes(alias)) ||
+      matchedProcessBundles.length > 0;
     const wantsChinaDirect =
       clause.includes("国内") ||
       clause.includes("中国") ||

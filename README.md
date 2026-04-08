@@ -94,6 +94,15 @@ flowchart TD
 
 系统会把这些意图编译成内部规则，再进一步生成 `sing-box` 配置。
 
+现在内置了一个可维护的 bundle discovery 层：
+
+- 站点 bundle
+  - 例如 `NotebookLM`、`Gemini`、`OpenRouter`、`Google Stitch`
+- 进程 bundle
+  - 例如 `Antigravity`、`Cursor`、`VS Code`、`Codex`
+
+这意味着多数情况下你不需要自己记住相关域名或辅助进程名。
+
 ### 2. 极简 DSL
 
 对于高级用户，仍然保留了一个极简 YAML DSL，用于补充少量例外规则，而不是逼用户手写整份 `sing-box` JSON。
@@ -311,6 +320,10 @@ singbox-iac use 'GitHub 这类开发类都走香港，Gemini 走新加坡'
 
 ```bash
 singbox-iac use 'Google 服务和 GitHub 走香港，Amazon Prime 和 Apple TV 走新加坡，国内直连，每45分钟自动更新'
+```
+
+```bash
+singbox-iac use 'NotebookLM 走美国，Cursor 走独立入口并出口到美国'
 ```
 
 作者层支持：

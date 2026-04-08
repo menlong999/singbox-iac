@@ -74,13 +74,31 @@ describe("natural language authoring", () => {
       plan.beforeBuiltins.some((rule) => rule.domainSuffix?.includes("gemini.google.com")),
     ).toBe(true);
     expect(plan.beforeBuiltins.some((rule) => rule.route === "SG")).toBe(true);
-    expect(plan.notes.some((note) => note.includes("built-in proxifier flow"))).toBe(true);
+    expect(
+      plan.notes.some((note) => note.includes("built-in proxifier bundles: Antigravity")),
+    ).toBe(true);
     expect(
       plan.verificationOverrides?.some(
         (override) =>
           override.inbound === "in-mixed" &&
           override.domainSuffix === "gemini.google.com" &&
           override.expectedOutbound === "SG",
+      ),
+    ).toBe(true);
+  });
+
+  it("expands recognized site bundles such as NotebookLM into explicit domains and verification hints", () => {
+    const plan = generateRulesFromPrompt("NotebookLM 走美国");
+
+    expect(
+      plan.beforeBuiltins.some(
+        (rule) => rule.domainSuffix?.includes("notebooklm.google.com") && rule.route === "US",
+      ),
+    ).toBe(true);
+    expect(
+      plan.verificationOverrides?.some(
+        (override) =>
+          override.domainSuffix === "notebooklm.google.com" && override.expectedOutbound === "US",
       ),
     ).toBe(true);
   });

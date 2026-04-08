@@ -46,6 +46,17 @@ To see the supported bundle presets:
 singbox-iac proxifier bundles
 ```
 
+The bundle list is now backed by a maintained process bundle registry rather than a docs-only preset list. That registry includes prompt aliases, process matchers, and bundle metadata for tools such as:
+
+- `Antigravity`
+- `Cursor`
+- `VS Code`
+- `Claude Code`
+- `Gemini CLI`
+- `Codex`
+- `Copilot CLI`
+- `Developer AI CLI`
+
 To inspect one declarative bundle:
 
 ```bash

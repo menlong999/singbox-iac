@@ -9,7 +9,10 @@ Allow users to customize routing intent with a compact YAML DSL instead of raw s
 - The DSL must be YAML-based and easy to hand-edit.
 - The DSL must support explicit insertion points relative to built-in routing behavior.
 - The project must provide a small catalog of built-in rule templates for common developer and video-site use cases.
+- The project must provide a first-class built-in site bundle registry so common product names can resolve to maintained related domain sets.
+- The project must provide maintained built-in process bundle metadata so common developer and AI tools can resolve to reusable process matchers.
 - Mainstream subscription vocabulary such as Google services, Apple services, Netflix, Amazon Prime Video, Apple TV, and common developer-site classes should map cleanly to authoring intent.
+- Natural-language authoring should resolve recognized product names through the built-in site and process bundle registries before falling back to ad-hoc explicit domains or generic process notes.
 - The project must support natural-language authoring that generates the DSL instead of mutating sing-box JSON directly.
 - Natural-language authoring must support a reliable deterministic mode with no API dependency.
 - Natural-language authoring may optionally use local AI CLIs, but it must be able to fall back safely when those CLIs are unavailable or unusable.
@@ -52,3 +55,8 @@ Allow users to customize routing intent with a compact YAML DSL instead of raw s
 - developer common tooling sites
 - region-oriented video-site bundles
 - mainland direct video-site bundles
+
+## Bundle Discovery
+
+- site bundles should include canonical product names, related domain suffixes, and suggested verification URLs
+- process bundles should include reusable process matchers and prompt-discovery aliases

@@ -3,25 +3,17 @@ import path from "node:path";
 
 import YAML from "yaml";
 
+import {
+  type ProcessBundleSpec as ProxifierBundleSpec,
+  type ProcessBundleMatcher as ProxifierProcessMatcher,
+  getProcessBundle,
+  listProcessBundles,
+  selectProcessBundlesFromText,
+} from "../bundle-registry/index.js";
+
 export interface ProxifierListenerConfig {
   readonly host: string;
   readonly port: number;
-}
-
-export interface ProxifierProcessMatcher {
-  readonly processName?: string;
-  readonly bundleId?: string;
-  readonly pathRegex?: string;
-}
-
-export interface ProxifierBundleSpec {
-  readonly id: string;
-  readonly name: string;
-  readonly description: string;
-  readonly processMatchers: readonly ProxifierProcessMatcher[];
-  readonly targetInbound: "in-proxifier";
-  readonly targetOutboundGroup: string;
-  readonly notes?: readonly string[];
 }
 
 export interface ProxifierScaffoldInput {
@@ -41,130 +33,12 @@ export interface ProxifierScaffoldResult {
   readonly bundles: readonly ProxifierBundleSpec[];
 }
 
-const bundleDefinitions: readonly ProxifierBundleSpec[] = [
-  {
-    id: "antigravity",
-    name: "Antigravity",
-    description: "Google Antigravity desktop app, helpers, and language services.",
-    targetInbound: "in-proxifier",
-    targetOutboundGroup: "Process-Proxy",
-    processMatchers: [
-      { processName: "Antigravity.app" },
-      { processName: "Antigravity" },
-      { bundleId: "com.google.antigravity" },
-      { processName: "*Antigravity*" },
-      { processName: "language_server_macos_arm" },
-      { processName: "antigravity-auto-updater" },
-      { processName: "*antigravity*" },
-    ],
-    notes: [
-      "Use this bundle when Antigravity or its language server does not honor the normal system proxy path.",
-    ],
-  },
-  {
-    id: "cursor",
-    name: "Cursor",
-    description: "Cursor desktop app and helper processes.",
-    targetInbound: "in-proxifier",
-    targetOutboundGroup: "Process-Proxy",
-    processMatchers: [
-      { processName: "Cursor" },
-      { processName: "Cursor.app" },
-      { processName: "Cursor Helper" },
-      { processName: "cursor" },
-      { processName: "*cursor*" },
-    ],
-  },
-  {
-    id: "vscode",
-    name: "VS Code",
-    description: "Visual Studio Code desktop app, helper processes, and CLI entrypoints.",
-    targetInbound: "in-proxifier",
-    targetOutboundGroup: "Process-Proxy",
-    processMatchers: [
-      { processName: "Visual Studio Code" },
-      { processName: "Code" },
-      { processName: "Code Helper" },
-      { bundleId: "com.microsoft.VSCode" },
-      { processName: "code" },
-    ],
-  },
-  {
-    id: "claude-code",
-    name: "Claude Code",
-    description: "Claude CLI and related coding-agent processes.",
-    targetInbound: "in-proxifier",
-    targetOutboundGroup: "Process-Proxy",
-    processMatchers: [{ processName: "claude" }, { processName: "claude-code" }],
-  },
-  {
-    id: "gemini-cli",
-    name: "Gemini CLI",
-    description: "Gemini CLI and related local agent processes.",
-    targetInbound: "in-proxifier",
-    targetOutboundGroup: "Process-Proxy",
-    processMatchers: [{ processName: "gemini" }, { processName: "gemini-cli" }],
-  },
-  {
-    id: "codex",
-    name: "Codex",
-    description: "Codex desktop or CLI agent processes.",
-    targetInbound: "in-proxifier",
-    targetOutboundGroup: "Process-Proxy",
-    processMatchers: [{ processName: "codex" }, { processName: "codex-cli" }],
-  },
-  {
-    id: "copilot-cli",
-    name: "Copilot CLI",
-    description: "GitHub Copilot CLI-style developer tooling processes.",
-    targetInbound: "in-proxifier",
-    targetOutboundGroup: "Process-Proxy",
-    processMatchers: [
-      { processName: "copilot" },
-      { processName: "github-copilot" },
-      { processName: "copilot-cli" },
-    ],
-  },
-  {
-    id: "developer-ai-cli",
-    name: "Developer AI CLI",
-    description: "A convenience bundle for common coding-agent and AI CLI tools.",
-    targetInbound: "in-proxifier",
-    targetOutboundGroup: "Process-Proxy",
-    processMatchers: [
-      { processName: "claude" },
-      { processName: "codex" },
-      { processName: "gemini" },
-      { processName: "codebuddy" },
-      { processName: "cbc" },
-      { processName: "opencode" },
-      { processName: "qoder" },
-      { processName: "qodercli" },
-      { processName: "trae" },
-    ],
-    notes: [
-      "Use this bundle when you want a single catch-all process list for developer AI tools.",
-    ],
-  },
-];
-
-const promptBundleAliases: Readonly<Record<string, readonly string[]>> = {
-  antigravity: ["antigravity", "google antigravity", "google.antigravity"],
-  cursor: ["cursor"],
-  vscode: ["vscode", "vs code", "visual studio code", "code helper"],
-  "claude-code": ["claude code", "claude cli", "claude"],
-  "gemini-cli": ["gemini cli", "gemini"],
-  codex: ["codex"],
-  "copilot-cli": ["copilot cli", "copilot"],
-  "developer-ai-cli": ["ai ide", "ai cli", "coding agent", "developer ai"],
-};
-
 export function listProxifierBundles(): readonly ProxifierBundleSpec[] {
-  return bundleDefinitions;
+  return listProcessBundles();
 }
 
 export function getProxifierBundle(id: string): ProxifierBundleSpec | undefined {
-  return bundleDefinitions.find((bundle) => bundle.id === id);
+  return getProcessBundle(id);
 }
 
 export function renderProxifierBundleSpec(bundle: ProxifierBundleSpec): string {
@@ -172,34 +46,17 @@ export function renderProxifierBundleSpec(bundle: ProxifierBundleSpec): string {
     id: bundle.id,
     name: bundle.name,
     description: bundle.description,
+    promptAliases: [...bundle.promptAliases],
     targetInbound: bundle.targetInbound,
     targetOutboundGroup: bundle.targetOutboundGroup,
+    tags: [...bundle.tags],
     processMatchers: bundle.processMatchers,
     ...(bundle.notes && bundle.notes.length > 0 ? { notes: [...bundle.notes] } : {}),
   });
 }
 
 export function selectProxifierBundlesFromPrompt(prompt: string): readonly string[] {
-  const normalized = prompt.toLowerCase();
-  const matched = new Set<string>();
-
-  if (
-    normalized.includes("proxifier") ||
-    normalized.includes("进程级") ||
-    normalized.includes("process-level") ||
-    normalized.includes("独立入口")
-  ) {
-    matched.add("developer-ai-cli");
-    matched.add("antigravity");
-  }
-
-  for (const [bundleId, aliases] of Object.entries(promptBundleAliases)) {
-    if (aliases.some((alias) => normalized.includes(alias))) {
-      matched.add(bundleId);
-    }
-  }
-
-  return [...matched];
+  return selectProcessBundlesFromText(prompt).map((bundle) => bundle.id);
 }
 
 export async function writeProxifierScaffold(
@@ -301,7 +158,7 @@ function resolveBundles(bundleIds?: readonly string[]): readonly ProxifierBundle
   }
 
   const requested = new Set(bundleIds);
-  return bundleDefinitions.filter((bundle) => requested.has(bundle.id));
+  return listProcessBundles().filter((bundle) => requested.has(bundle.id));
 }
 
 function renderGuide(input: {
@@ -357,17 +214,11 @@ function renderGuide(input: {
       );
       lines.push(`  - inbound: \`${bundle.targetInbound}\``);
       lines.push(`  - outbound: \`${bundle.targetOutboundGroup}\``);
+      lines.push(`  - aliases: ${bundle.promptAliases.join(", ")}`);
     }
-  } else {
-    lines.push(
-      "",
-      "## Suggested Bundles",
-      "",
-      "- No specific bundle matched the current prompt. Start with `custom-processes.txt` and add your target app names manually.",
-    );
   }
 
-  return `${lines.join("\n")}\n`;
+  return lines.join("\n").concat("\n");
 }
 
 function collectDisplayProcessNames(
@@ -382,9 +233,8 @@ function collectDisplayProcessNames(
       values.add(`bundle:${matcher.bundleId}`);
     }
     if (matcher.pathRegex) {
-      values.add(`path:${matcher.pathRegex}`);
+      values.add(`regex:${matcher.pathRegex}`);
     }
   }
-
   return [...values];
 }

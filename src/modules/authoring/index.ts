@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import type { BuilderConfig } from "../../config/schema.js";
 import type { IntentIR } from "../../domain/intent.js";
+import { listProcessBundles, listSiteBundles } from "../bundle-registry/index.js";
 import { intentFromNaturalLanguagePlan } from "../intent/index.js";
 import {
   type NaturalLanguagePlan,
@@ -549,10 +550,13 @@ function buildAuthoringSystemPrompt(config?: BuilderConfig): string {
     "You translate short routing prompts into singbox-iac rule plans.",
     "Respond only with JSON matching the supplied schema.",
     "Use templateIds for common site bundles when possible.",
+    "Resolve recognized product names through the built-in site and process bundle registries before inventing new domains or process names.",
     "Use beforeBuiltins for non-direct overrides and afterBuiltins for direct routing.",
     "Do not invent process-matching rules for IDE or Proxifier phrases; emit a short note instead.",
     `Allowed route targets: ${context.allowedRoutes.join(", ")}`,
     `Available templateIds: ${context.templateIds.join(", ")}`,
+    `Available site bundles: ${context.siteBundleIds.join(", ")}`,
+    `Available process bundles: ${context.processBundleIds.join(", ")}`,
     `Available ruleSet tags: ${context.ruleSetTags.join(", ") || "(none)"}`,
   ].join(" ");
 }
@@ -560,6 +564,8 @@ function buildAuthoringSystemPrompt(config?: BuilderConfig): string {
 function buildAuthoringContext(config?: BuilderConfig): {
   readonly allowedRoutes: readonly string[];
   readonly templateIds: readonly string[];
+  readonly siteBundleIds: readonly string[];
+  readonly processBundleIds: readonly string[];
   readonly ruleSetTags: readonly string[];
 } {
   const allowedRoutes = new Set<string>([
@@ -598,6 +604,8 @@ function buildAuthoringContext(config?: BuilderConfig): {
       "video-jp",
       "cn-video-direct",
     ],
+    siteBundleIds: listSiteBundles().map((bundle) => bundle.id),
+    processBundleIds: listProcessBundles().map((bundle) => bundle.id),
     ruleSetTags: config?.ruleSets.map((ruleSet) => ruleSet.tag) ?? [],
   };
 }

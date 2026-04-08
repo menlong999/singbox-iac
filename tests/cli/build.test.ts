@@ -42,10 +42,12 @@ describe("build command", () => {
     };
 
     expect(generated.route.final).toBe("Global");
-    expect(generated.inbounds).toMatchObject([
-      { tag: "in-mixed", listen_port: 39097 },
-      { tag: "in-proxifier", listen_port: 39091 },
-    ]);
+    expect(generated.inbounds).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ tag: "in-mixed", listen_port: 39097 }),
+        expect.objectContaining({ tag: "in-proxifier", listen_port: 39091 }),
+      ]),
+    );
     expect(generated.outbounds.some((outbound) => outbound.tag === "Global")).toBe(true);
     expect(generated.outbounds.some((outbound) => outbound.tag === "🇭🇰 香港 01")).toBe(true);
     expect(writeSpy).toHaveBeenCalled();

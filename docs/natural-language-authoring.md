@@ -145,6 +145,8 @@ It works best for:
 - process-aware reminders like `IDE 走 proxifier`
 - site classes like `视频网站走美国`
 - named products like `Google Stitch 走美国`
+- named site bundles like `NotebookLM 走美国`
+- named process bundles like `Cursor 走独立入口` or `Codex 走独立入口`
 - short regional intents like `OpenRouter 走香港`
 - schedule phrases like `每45分钟自动更新`
 - one-sentence developer routing like `GitHub 这类开发类走香港，Antigravity 进程级走美国，Gemini 走新加坡`
@@ -180,6 +182,41 @@ Common category-style examples:
 - `Apple 服务走香港`
 - `Amazon Prime 和 Apple TV 走新加坡`
 - `视频网站走美国`
+
+## Built-In Bundle Discovery
+
+The built-in registry is now the primary discovery layer for common products.
+
+Examples:
+
+- site bundles
+  - `NotebookLM`
+  - `Gemini`
+  - `ChatGPT`
+  - `OpenRouter`
+  - `Google Stitch`
+- process bundles
+  - `Antigravity`
+  - `Cursor`
+  - `VS Code`
+  - `Claude Code`
+  - `Gemini CLI`
+  - `Codex`
+  - `Copilot CLI`
+
+When a prompt mentions one of these products, the authoring layer resolves it through the maintained bundle registry before falling back to ad-hoc explicit domains.
+
+Examples:
+
+```bash
+./node_modules/.bin/tsx src/cli/index.ts use \
+  'NotebookLM 走美国'
+```
+
+```bash
+./node_modules/.bin/tsx src/cli/index.ts use \
+  'Antigravity 进程级走美国，GitHub 走香港'
+```
 
 Supported schedule phrases include:
 

@@ -55,7 +55,7 @@ runtime:
   checkCommand: "sing-box check -c {{stagingPath}}"
   reload:
     kind: "signal"
-    processName: "sing-box"
+    processName: "sing-box-update-test"
     signal: "HUP"
   dependencies:
     singBoxBinary: "${binaryPath}"
