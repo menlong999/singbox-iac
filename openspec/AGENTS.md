@@ -1,5 +1,7 @@
 # OpenSpec Working Notes
 
+Read `/Users/lvyuanfang/Code/SingBoxConfig/docs/agent-context.md` before exploring `openspec/` so the current phase and roadmap are clear.
+
 ## Purpose
 
 This directory stores the long-lived specification assets for `Sing-box IaC Builder`.
@@ -16,4 +18,4 @@ This directory stores the long-lived specification assets for `Sing-box IaC Buil
 - Use small changesets.
 - Update specs before implementation when behavior is changing.
 - Keep implementation phases aligned with `changes/*/tasks.md`.
-
+- Prefer progressive disclosure: read only the spec, change, and docs that are relevant to the current task.
