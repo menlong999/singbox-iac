@@ -34,7 +34,7 @@ Many macOS users rely on GUI clients like Clash Verge, upstream subscriptions, g
 
 `Singbox IaC` compresses that problem into:
 
-`subscription -> parse -> compile -> verify -> apply -> schedule`
+`subscription -> intent -> DNS / verification planning -> compile -> verify -> apply -> runtime / schedule`
 
 ## Architecture
 
@@ -62,7 +62,7 @@ The system has three layers:
 
 ```mermaid
 flowchart TD
-    A["User provides subscription URL + one sentence"] --> B["quickstart / setup --ready"]
+    A["User provides subscription URL + one sentence"] --> B["go"]
     B --> C["Detect local environment<br/>macOS / sing-box / Chrome / AI CLI"]
     C --> D["Generate rules from intent"]
     D --> E["Sync local rule sets"]
@@ -93,6 +93,22 @@ You can describe routing goals in plain language instead of editing raw `sing-bo
 - `Apple TV and Netflix should use Singapore`
 
 The tool compiles those intents into internal rules and then into a `sing-box` config.
+
+There is now a maintained bundle-discovery layer:
+
+- site bundles
+  - for example `NotebookLM`, `Gemini`, `OpenRouter`, and `Google Stitch`
+- process bundles
+  - for example `Antigravity`, `Cursor`, `VS Code`, and `Codex`
+
+Site bundles use a dual-track model:
+
+- prefer official `sing-geosite` rule-set tags that are already enabled in the current config
+- fall back to curated domains when upstream has no suitable tag or the current config has not enabled it yet
+
+Process bundles keep stable metadata for `Proxifier` and `in-proxifier` process matching.
+
+In most cases that means you do not need to remember related domains, official geosite tags, or helper process names yourself.
 
 ### 2. Minimal DSL
 
@@ -173,6 +189,8 @@ singbox-iac update
 - `use`: change policy later with one sentence and re-apply it
 - `update`: refresh the subscription and apply the latest config
 
+`use` defaults to patch semantics. It preserves unrelated previously authored intent unless you explicitly pass `--replace`.
+
 For desktop runtime and troubleshooting, the most useful commands are:
 
 ```bash
@@ -180,35 +198,49 @@ singbox-iac start
 singbox-iac stop
 singbox-iac restart
 singbox-iac status
+singbox-iac diagnose
 ```
 
 - `start`: start the desktop runtime as a dedicated macOS LaunchAgent
 - `stop`: stop the desktop runtime and let `sing-box` release system proxy or TUN resources
 - `restart`: restart the desktop runtime
 - `status`: summarize live config, desktop runtime, system proxy/TUN state, schedule, and the latest transaction
+- `diagnose`: extend `status` with default route, system DNS, and representative DNS evidence when you need to understand why the network is still wrong
 
 For troubleshooting, start with:
 
 ```bash
 singbox-iac status
+singbox-iac diagnose
 ```
 
-It summarizes the current `sing-box` binary, live config, process state, listener activity,
-schedule state, and the latest publish transaction.
+`status` is the compact runtime snapshot. `diagnose` is the heavier triage command when you need to separate runtime drift from local DNS or default-route problems.
 
 Everything else can be treated as advanced commands for debugging or fine-grained control.
 
-`RuntimeMode` is an internal concept; users do not need to choose one manually. Onboarding and `update` infer `browser-proxy`, `process-proxy`, or `headless-daemon` and use that to guide visible verification and runtime defaults. See [docs/runtime-modes.md](./docs/runtime-modes.md).
-
-### One-step onboarding
+For example:
 
 ```bash
-singbox-iac quickstart \
-  --subscription-url 'your subscription URL' \
-  --prompt 'GitHub and developer sites go through Hong Kong, Antigravity process traffic goes through the US, Gemini goes through Singapore, update every 30 minutes'
+singbox-iac rulesets list --filter openai
 ```
 
-`quickstart` will:
+That hidden command shows:
+
+- which `ruleSet` tags are enabled in the current builder config
+- which upstream `sing-geosite` and `sing-geoip` tags are available
+- which built-in site bundles prefer official tags and which still fall back to curated domains
+
+`RuntimeMode` is an internal concept; users do not need to choose one manually. Onboarding and `update` infer `browser-proxy`, `process-proxy`, or `headless-daemon` and use that to guide visible verification and runtime defaults. See [docs/runtime-modes.md](./docs/runtime-modes.md).
+
+### Default first-run path
+
+```bash
+singbox-iac go \
+  'your subscription URL' \
+  'GitHub and developer sites go through Hong Kong, Antigravity process traffic goes through the US, Gemini goes through Singapore, update every 30 minutes'
+```
+
+`go` will:
 
 - create `~/.config/singbox-iac/builder.config.yaml`
 - create `~/.config/singbox-iac/rules/custom.rules.yaml`
@@ -232,7 +264,7 @@ singbox-iac setup \
 
 The difference is simple:
 
-- `quickstart` is the shortest opinionated first-run path
+- `go` is the shortest recommended first-run path
 - `setup --ready` is better if you still want to control run/browser/Proxifier flags yourself
 
 ### Manual foreground run
@@ -294,17 +326,28 @@ singbox-iac use 'GitHub and developer sites go through Hong Kong, Gemini goes th
 
 For common cases, you do not need to learn raw `sing-box` JSON or even the DSL.
 
+`use` defaults to patch instead of replace:
+
+- `singbox-iac use 'NotebookLM goes through the US'`
+  - augments or overrides the relevant part of the current authored intent
+- `singbox-iac use 'All developer traffic goes through Singapore' --replace`
+  - explicitly rebuilds the authored policy set from scratch
+
+The tool keeps two related files:
+
+- `rules.userRulesFile`
+  - the merged YAML DSL that the compiler actually consumes
+- sibling `*.authoring.yaml`
+  - the layered authoring state used to preserve a base intent plus later patches
+
 Examples:
 
 ```bash
-singbox-iac author \
-  --prompt 'GitHub and dev sites should use Hong Kong, Antigravity process traffic should use a dedicated US path, Gemini should use Singapore'
+singbox-iac use 'Google services and GitHub use Hong Kong, Amazon Prime and Apple TV use Singapore, China traffic stays direct, update every 45 minutes'
 ```
 
 ```bash
-singbox-iac author \
-  --prompt 'Google services and GitHub use Hong Kong, Amazon Prime and Apple TV use Singapore, China traffic stays direct, update every 45 minutes' \
-  --update
+singbox-iac use 'NotebookLM goes through the US, Cursor uses a dedicated ingress and exits through the US'
 ```
 
 The authoring layer supports:
@@ -321,6 +364,14 @@ Recommended before applying a production routing change:
 ```bash
 singbox-iac use 'GitHub and developer sites go through Hong Kong, Gemini goes through Singapore' --strict --diff
 ```
+
+If you explicitly want to discard the earlier natural-language policy set, use:
+
+```bash
+singbox-iac use 'Google services and GitHub use Singapore' --replace
+```
+
+If you need preview-only operation, direct `Intent IR`, or staged author/build/update control, use the power-user `author` command. See [docs/natural-language-authoring.md](./docs/natural-language-authoring.md).
 
 ## Proxifier Onboarding
 
@@ -388,24 +439,24 @@ This project is designed to keep sensitive inputs local by default:
 
 The project does not automatically upload subscription URLs to any remote service. Unless you explicitly configure an external AI CLI or external command, the default authoring path does not depend on an external API.
 
-## Common Commands
+## Power-User / Engineering Commands
+
+Unless you are splitting the pipeline, doing deeper diagnostics, or handling a special integration, you usually do not need these directly:
 
 ```bash
 singbox-iac init
 singbox-iac setup
-singbox-iac quickstart
 singbox-iac author
 singbox-iac build
 singbox-iac check
 singbox-iac apply
 singbox-iac run
 singbox-iac verify
-singbox-iac update
-singbox-iac doctor
 singbox-iac proxifier bundles
 singbox-iac proxifier bundles show antigravity
 singbox-iac proxifier bundles render antigravity
 singbox-iac proxifier scaffold
+singbox-iac rulesets list --filter openai
 singbox-iac schedule install
 singbox-iac schedule remove
 singbox-iac templates list

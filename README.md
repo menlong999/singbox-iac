@@ -34,7 +34,7 @@
 
 `Singbox IaC` 的目标就是把这些需求收敛成：
 
-`subscription -> parse -> compile -> verify -> apply -> schedule`
+`subscription -> intent -> DNS / verification planning -> compile -> verify -> apply -> runtime / schedule`
 
 ## 架构图
 
@@ -262,6 +262,11 @@ singbox-iac setup \
   --ready
 ```
 
+两者区别很简单：
+
+- `go`：最短、默认推荐的首次上手路径
+- `setup --ready`：保留更多开关和显式阶段控制的 power-user 路径
+
 ### 前台运行测试
 
 ```bash
@@ -451,6 +456,7 @@ singbox-iac proxifier bundles
 singbox-iac proxifier bundles show antigravity
 singbox-iac proxifier bundles render antigravity
 singbox-iac proxifier scaffold
+singbox-iac rulesets list --filter openai
 singbox-iac schedule install
 singbox-iac schedule remove
 singbox-iac templates list
