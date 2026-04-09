@@ -53,6 +53,13 @@ The builder config now persists an internal desktop runtime profile:
 
 During onboarding, prompts that mention `TUN`, `全局代理`, or `全局模式` are inferred as `tun`; otherwise the default is `system-proxy`.
 
+Closed-loop verification does not need privileged `tun` startup:
+
+- generated staging and live configs still keep the configured `tun` inbound
+- the transient verification runtime rewrites `in-tun` into a local unprivileged listener shape
+- the transient verification runtime also forces a local real-ip DNS shape and drops `fakeip` cache-file dependencies
+- normal `use`, `setup`, `update`, and `verify` flows therefore do not need `tun` device permissions just to validate routing behavior
+
 ## Runtime Control
 
 Use the dedicated runtime commands for GUI-like everyday control:

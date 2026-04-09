@@ -62,6 +62,8 @@ Focused command groups:
 - `run` must support foreground execution of a generated config for manual testing.
 - `verify` must support closed-loop validation of critical routing behavior with generated configs and real client traffic.
 - `verify` must be able to consume user-journey scenarios from builder config, including inbound choice, target URL, and expected outbound selector or leaf.
+- `verify` and verification steps embedded in `go`, `setup`, `use`, and `update` must be able to validate `tun`-profile configs without requiring a privileged `tun` device startup in the transient verification runtime.
+- When verifying a `tun`-profile config, the transient verification runtime must rewrite `in-tun` into an unprivileged local listener shape and must not retain `fakeip` DNS or `experimental.cache_file` dependencies from the real runtime profile.
 - `update` must perform fetch, build, validation, and apply in one flow.
 - `doctor` must surface environment gaps such as missing `sing-box`.
 - `diagnose` must summarize runtime, listener, proxy, schedule, recent transaction, and best-effort DNS/network evidence in one command.

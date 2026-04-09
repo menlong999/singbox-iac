@@ -148,6 +148,99 @@ describe("verification helpers", () => {
     expect(checks.every((check) => check.passed)).toBe(true);
   });
 
+  it("rewrites tun inbounds into an unprivileged mixed listener during verification", async () => {
+    const baseConfig = {
+      log: { level: "info" },
+      dns: {
+        servers: [
+          { type: "local", tag: "dns-local-default" },
+          { type: "udp", tag: "dns-remote-primary", server: "1.1.1.1", server_port: 53 },
+          { type: "udp", tag: "dns-remote-cn", server: "223.5.5.5", server_port: 53 },
+          { type: "fakeip", tag: "dns-fakeip", inet4_range: "198.18.0.0/15" },
+        ],
+        final: "dns-local-default",
+        rules: [{ query_type: ["A", "AAAA"], server: "dns-fakeip" }],
+      },
+      inbounds: [
+        {
+          type: "mixed",
+          tag: "in-mixed",
+          listen: "127.0.0.1",
+          listen_port: 39097,
+        },
+        {
+          type: "mixed",
+          tag: "in-proxifier",
+          listen: "127.0.0.1",
+          listen_port: 39091,
+        },
+        {
+          type: "tun",
+          tag: "in-tun",
+          interface_name: "utun9",
+          address: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+          auto_route: true,
+          strict_route: false,
+        },
+      ],
+      outbounds: [{ type: "direct", tag: "direct" }],
+      experimental: {
+        cache_file: {
+          enabled: true,
+          path: "/tmp/tun-cache.db",
+          store_fakeip: true,
+        },
+      },
+      route: {
+        rules: [
+          { network: "udp", port: 443, action: "reject" },
+          { protocol: "dns", action: "hijack-dns" },
+        ],
+        final: "direct",
+        default_domain_resolver: "dns-local-default",
+      },
+    };
+
+    const prepared = await prepareVerificationConfig(baseConfig);
+    expect(prepared.config.inbounds).toEqual([
+      {
+        type: "mixed",
+        tag: "in-mixed",
+        listen: "127.0.0.1",
+        listen_port: prepared.mixedPort,
+      },
+      {
+        type: "mixed",
+        tag: "in-proxifier",
+        listen: "127.0.0.1",
+        listen_port: prepared.proxifierPort,
+      },
+      {
+        type: "mixed",
+        tag: "in-tun",
+        listen: "127.0.0.1",
+        listen_port: expect.any(Number),
+      },
+    ]);
+    expect(
+      (prepared.config.inbounds as Array<{ tag: string; listen_port: number }>).find(
+        (inbound) => inbound.tag === "in-tun",
+      )?.listen_port,
+    ).not.toBe(prepared.mixedPort);
+    expect(
+      (prepared.config.inbounds as Array<{ tag: string; listen_port: number }>).find(
+        (inbound) => inbound.tag === "in-tun",
+      )?.listen_port,
+    ).not.toBe(prepared.proxifierPort);
+    expect(prepared.config.dns).toEqual({
+      servers: [{ type: "local", tag: "dns-local-verify" }],
+      rules: [],
+      final: "dns-local-verify",
+      reverse_mapping: false,
+    });
+    expect(prepared.config.experimental).toBeUndefined();
+  });
+
   it("treats proxifier CONNECT establishment as a route-level success for timeout-prone upstreams", () => {
     expect(
       isRouteLevelProxySuccess(

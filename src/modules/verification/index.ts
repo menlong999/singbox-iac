@@ -602,14 +602,27 @@ export async function prepareVerificationConfig(
   const cloned = structuredClone(config) as JsonObject;
   const mixedPort = await findAvailablePort();
   const proxifierPort = await findAvailablePort();
+  const tunPort = await findAvailablePort();
 
   const inbounds = ensureArray<JsonObject>(cloned.inbounds, "Config is missing inbounds.");
+  const hasMixedInbound = inbounds.some((inbound) => inbound.tag === "in-mixed");
   for (const inbound of inbounds) {
     if (inbound.tag === "in-mixed") {
       inbound.listen_port = mixedPort;
     }
     if (inbound.tag === "in-proxifier") {
       inbound.listen_port = proxifierPort;
+    }
+    if (inbound.tag === "in-tun") {
+      for (const key of Object.keys(inbound)) {
+        inbound[key] = undefined;
+      }
+      Object.assign(inbound, {
+        type: "mixed",
+        tag: hasMixedInbound ? "in-tun" : "in-mixed",
+        listen: "127.0.0.1",
+        listen_port: hasMixedInbound ? tunPort : mixedPort,
+      });
     }
   }
 
@@ -622,10 +635,18 @@ export async function prepareVerificationConfig(
       tag: "dns-local-verify",
     },
   ];
+  dns.rules = [];
   dns.final = "dns-local-verify";
+  dns.reverse_mapping = false;
 
   const route = asObject(cloned.route, "Config is missing route.");
   route.default_domain_resolver = "dns-local-verify";
+
+  if (typeof cloned.experimental === "object" && cloned.experimental !== null) {
+    const experimental = asObject(cloned.experimental, "Config has an invalid experimental block.");
+    const { cache_file: _cacheFile, ...remaining } = experimental;
+    cloned.experimental = Object.keys(remaining).length === 0 ? undefined : remaining;
+  }
 
   const outbounds = ensureArray<JsonObject>(cloned.outbounds, "Config is missing outbounds.");
   const globalIndex = outbounds.findIndex((outbound) => outbound.tag === "Global");
