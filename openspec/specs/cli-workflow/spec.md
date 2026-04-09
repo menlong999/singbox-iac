@@ -24,6 +24,7 @@ Provide a user-friendly command-line interface for initialization, build, apply,
 - `proxifier scaffold`
 - `schedule install`
 - `schedule remove`
+- `rulesets list`
 
 ## Requirements
 
@@ -56,6 +57,7 @@ Provide a user-friendly command-line interface for initialization, build, apply,
 - `diagnose` should help distinguish local environment failures from runtime drift without claiming root cause with certainty.
 - `proxifier bundles` must enumerate the supported process presets that can help users build Proxifier rules.
 - `proxifier bundles` should expose maintained bundle metadata for common developer and AI tools instead of relying on ad-hoc docs-only process lists.
+- `rulesets list` must be able to show configured rule-set tags from the current builder config and refreshable official upstream geosite/geoip tags.
 - `proxifier scaffold` must generate a helper directory from the configured `in-proxifier` listener and optional prompt-derived process bundles.
 - Example and fallback listener defaults should avoid common Clash-family local ports to support side-by-side testing on macOS.
 - The distributed CLI package must be installable from an npm tarball with a working `singbox-iac` binary entrypoint.

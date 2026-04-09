@@ -9,6 +9,8 @@ Built-in rule templates are intended to cover the repetitive cases that most dev
 
 Templates are not a replacement for the compiler's built-in policy. They sit on top of it and are meant for fast customization.
 
+They also do not replace built-in site bundles. Templates are coarse category shortcuts; site bundles are product-level discovery objects that now prefer official `ruleSet` tags when possible and fall back to curated domains when necessary.
+
 ## Current Templates
 
 ### Developer

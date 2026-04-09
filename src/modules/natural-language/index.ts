@@ -5,7 +5,10 @@ import YAML from "yaml";
 
 import type { BuilderConfig } from "../../config/schema.js";
 import {
-  collectSiteBundleDomains,
+  type ResolvedSiteBundleMatchers,
+  collectSiteBundleFallbackHosts,
+  collectSiteBundleVerificationHosts,
+  resolveSiteBundleMatchers,
   selectProcessBundlesFromText,
   selectSiteBundlesFromText,
 } from "../bundle-registry/index.js";
@@ -42,6 +45,10 @@ export interface NaturalLanguagePlan {
 export interface NaturalLanguagePromptAnalysis {
   readonly plan: NaturalLanguagePlan;
   readonly ambiguities: readonly string[];
+}
+
+export interface NaturalLanguageAnalysisOptions {
+  readonly activeRuleSetTags?: readonly string[];
 }
 
 export interface PromptSelectableVerificationScenario {
@@ -130,11 +137,17 @@ const ambiguousPhraseDefinitions = [
   "approximately",
 ];
 
-export function generateRulesFromPrompt(prompt: string): NaturalLanguagePlan {
-  return analyzePrompt(prompt).plan;
+export function generateRulesFromPrompt(
+  prompt: string,
+  options?: NaturalLanguageAnalysisOptions,
+): NaturalLanguagePlan {
+  return analyzePrompt(prompt, options).plan;
 }
 
-export function analyzePrompt(prompt: string): NaturalLanguagePromptAnalysis {
+export function analyzePrompt(
+  prompt: string,
+  options?: NaturalLanguageAnalysisOptions,
+): NaturalLanguagePromptAnalysis {
   const text = normalizePrompt(prompt);
   const clauses = splitClauses(text);
   const templateIds = new Set<string>();
@@ -144,6 +157,7 @@ export function analyzePrompt(prompt: string): NaturalLanguagePromptAnalysis {
   const verificationOverrides: NaturalLanguageVerificationOverride[] = [];
   const groupDefaults: NonNullable<NaturalLanguagePlan["groupDefaults"]> = {};
   const ambiguities = new Set<string>();
+  const activeRuleSetTags = new Set(options?.activeRuleSetTags ?? []);
 
   const parsedInterval = parseScheduleIntervalMinutes(text);
 
@@ -151,6 +165,7 @@ export function analyzePrompt(prompt: string): NaturalLanguagePromptAnalysis {
     const route = extractRouteTarget(clause);
     const phase = route === "direct" ? "afterBuiltins" : "beforeBuiltins";
     const matchedSiteBundles = selectSiteBundlesFromText(clause);
+    const resolvedSiteBundles = resolveSiteBundleMatchers(matchedSiteBundles, activeRuleSetTags);
     const matchedProcessBundles = selectProcessBundlesFromText(clause);
     const hasProcessIntent =
       genericProcessIntentDefinitions.some((alias) => clause.includes(alias)) ||
@@ -158,7 +173,7 @@ export function analyzePrompt(prompt: string): NaturalLanguagePromptAnalysis {
     const hasAiCategory = hasTemplateAlias(clause, "developer-ai-sites");
     const hasDeveloperCategory = hasTemplateAlias(clause, "developer-common-sites");
     const hasStitchIntent = matchedSiteBundles.some((bundle) => bundle.id === "google-stitch");
-    const matchedDomains = new Set<string>();
+    const requestedHosts = new Set<string>();
     const explicitDomains = extractExplicitDomains(clause);
 
     for (const ambiguousPhrase of ambiguousPhraseDefinitions) {
@@ -209,12 +224,12 @@ export function analyzePrompt(prompt: string): NaturalLanguagePromptAnalysis {
       }
     }
 
-    for (const domain of collectSiteBundleDomains(matchedSiteBundles)) {
-      matchedDomains.add(domain);
+    for (const host of collectSiteBundleFallbackHosts(matchedSiteBundles)) {
+      requestedHosts.add(host);
     }
 
-    for (const domain of explicitDomains) {
-      matchedDomains.add(domain);
+    for (const host of collectSiteBundleVerificationHosts(matchedSiteBundles)) {
+      requestedHosts.add(host);
     }
 
     const referencesKnownIntent =
@@ -222,7 +237,8 @@ export function analyzePrompt(prompt: string): NaturalLanguagePromptAnalysis {
       hasAiCategory ||
       hasDeveloperCategory ||
       hasStitchIntent ||
-      matchedDomains.size > 0 ||
+      matchedSiteBundles.length > 0 ||
+      explicitDomains.length > 0 ||
       categoryTemplateDefinitions.some(({ aliases }) =>
         aliases.some((alias) => clause.includes(alias)),
       );
@@ -238,25 +254,53 @@ export function analyzePrompt(prompt: string): NaturalLanguagePromptAnalysis {
       );
     }
 
-    if (matchedDomains.size > 0 && route && !hasStitchIntent) {
-      const rule: UserRouteRule = {
-        name: `Generated from prompt: ${Array.from(matchedDomains).join(", ")}`,
-        domainSuffix: [...matchedDomains],
-        route,
-      };
+    if (
+      (resolvedSiteBundles.length > 0 || explicitDomains.length > 0) &&
+      route &&
+      !hasStitchIntent
+    ) {
+      const generatedRules = [
+        ...resolvedSiteBundles.map((matcher) => toUserRuleFromResolvedSiteBundle(matcher, route)),
+        ...(explicitDomains.length > 0
+          ? [
+              {
+                name: `Generated from prompt: ${explicitDomains.join(", ")}`,
+                domainSuffix: explicitDomains,
+                route,
+              } satisfies UserRouteRule,
+            ]
+          : []),
+      ];
+
       if (phase === "beforeBuiltins") {
-        beforeBuiltins.push(rule);
+        beforeBuiltins.push(...generatedRules);
       } else {
-        afterBuiltins.push(rule);
+        afterBuiltins.push(...generatedRules);
       }
 
       verificationOverrides.push(
-        ...[...matchedDomains].map((domain) => ({
+        ...[...requestedHosts, ...explicitDomains].map((domain) => ({
           inbound: "in-mixed" as const,
           domainSuffix: domain,
           expectedOutbound: route,
         })),
       );
+
+      for (const matcher of resolvedSiteBundles) {
+        if (!matcher.usedFallback) {
+          continue;
+        }
+        const preferredTags = matchedSiteBundles.find(
+          (bundle) => bundle.id === matcher.bundleId,
+        )?.preferredRuleSetTags;
+        if (!preferredTags || preferredTags.length === 0) {
+          continue;
+        }
+        notes.push(
+          `Site bundle "${matcher.bundleName}" fell back to curated domains because the current builder config does not enable: ${preferredTags.join(", ")}.`,
+        );
+      }
+
       continue;
     }
 
@@ -290,17 +334,23 @@ export function analyzePrompt(prompt: string): NaturalLanguagePromptAnalysis {
 export function selectVerificationScenariosForPrompt(
   prompt: string,
   scenarios: readonly PromptSelectableVerificationScenario[],
+  options?: NaturalLanguageAnalysisOptions,
 ): readonly PromptSelectableVerificationScenario[] {
   const text = normalizePrompt(prompt);
   const clauses = splitClauses(text);
   const selected = new Map<string, PromptSelectableVerificationScenario>();
+  const activeRuleSetTags = new Set(options?.activeRuleSetTags ?? []);
 
   for (const clause of clauses) {
     const requestedDomains = new Set<string>();
     const matchedSiteBundles = selectSiteBundlesFromText(clause);
     const matchedProcessBundles = selectProcessBundlesFromText(clause);
 
-    for (const domain of collectSiteBundleDomains(matchedSiteBundles)) {
+    for (const domain of collectSiteBundleFallbackHosts(matchedSiteBundles)) {
+      requestedDomains.add(domain);
+    }
+
+    for (const domain of collectSiteBundleVerificationHosts(matchedSiteBundles)) {
       requestedDomains.add(domain);
     }
 
@@ -367,6 +417,21 @@ export function selectVerificationScenariosForPrompt(
   }
 
   return scenarios.filter((scenario) => selected.has(scenario.id));
+}
+
+function toUserRuleFromResolvedSiteBundle(
+  matcher: ResolvedSiteBundleMatchers,
+  route: string,
+): UserRouteRule {
+  return {
+    name: `Generated from prompt: ${matcher.bundleName}`,
+    ...(matcher.ruleSet && matcher.ruleSet.length > 0 ? { ruleSet: matcher.ruleSet } : {}),
+    ...(matcher.domain && matcher.domain.length > 0 ? { domain: matcher.domain } : {}),
+    ...(matcher.domainSuffix && matcher.domainSuffix.length > 0
+      ? { domainSuffix: matcher.domainSuffix }
+      : {}),
+    route,
+  };
 }
 
 export async function writeGeneratedRules(input: {

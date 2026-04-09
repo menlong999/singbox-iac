@@ -549,7 +549,9 @@ export async function runSetupFlow(options: SetupCommandOptions): Promise<void> 
         effectiveConfig.verification.scenarios,
       );
       const selectedScenarios = options.prompt
-        ? selectVerificationScenariosForPrompt(options.prompt, runtimeScenarios)
+        ? selectVerificationScenariosForPrompt(options.prompt, runtimeScenarios, {
+            activeRuleSetTags: effectiveConfig.ruleSets.map((ruleSet) => ruleSet.tag),
+          })
         : runtimeScenarios.slice(
             0,
             Math.min(runtimeModeDefaults.visibleBrowserScenarioLimit, runtimeScenarios.length),

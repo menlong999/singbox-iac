@@ -41,6 +41,7 @@ describe("init command", () => {
     const generatedConfig = readFileSync(configOut, "utf8");
     expect(generatedConfig).toContain('url: "https://example.com/my-real-subscription"');
     expect(generatedConfig).toContain(`userRulesFile: "${rulesOut}"`);
+    expect(generatedConfig).toContain('tag: "geosite-openai"');
     expect(readFileSync(rulesOut, "utf8")).toContain("beforeBuiltins:");
     expect(writeSpy).toHaveBeenCalled();
   });

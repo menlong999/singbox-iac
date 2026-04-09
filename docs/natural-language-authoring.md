@@ -159,7 +159,7 @@ The `author` command does not require the user to think in DSL terms.
 For common developer sentences, it now compiles intent across three layers:
 
 1. specific site overrides
-   Example: `Gemini 走新加坡` becomes an explicit rule before built-ins.
+   Example: `Gemini 走新加坡` becomes a site rule before built-ins, preferably via an active official `ruleSet` tag and otherwise via curated fallback domains.
 2. selector default changes
    Example: `开发类都走香港` updates `Dev-Common-Out` to default to `HK`.
 3. verification expectation alignment
@@ -206,6 +206,31 @@ Examples:
 
 When a prompt mentions one of these products, the authoring layer resolves it through the maintained bundle registry before falling back to ad-hoc explicit domains.
 
+For site bundles, the resolution path is now:
+
+1. prefer active official `sing-geosite` tags already enabled in the current builder config
+2. fall back to curated exact domains and domain suffixes when upstream tags are missing or not enabled locally
+
+Examples of official tag-backed bundles:
+
+- `ChatGPT` / `OpenAI` -> prefer `geosite-openai`
+- `Perplexity` -> prefer `geosite-perplexity`
+- `YouTube` -> prefer `geosite-youtube`
+- `Netflix` -> prefer `geosite-netflix`
+- `Apple TV` -> prefer `geosite-apple-tvplus`
+
+Examples of fallback-first bundles:
+
+- `NotebookLM`
+- `OpenRouter`
+- `Google Stitch`
+- `MGTV`
+- `LeetCode`
+- `TradingView`
+- `TypingMind`
+- `Roam Research`
+- `Todoist`
+
 Examples:
 
 ```bash
@@ -216,6 +241,12 @@ Examples:
 ```bash
 ./node_modules/.bin/tsx src/cli/index.ts use \
   'Antigravity 进程级走美国，GitHub 走香港'
+```
+
+Inspect current configured and official upstream rule-set coverage:
+
+```bash
+./node_modules/.bin/tsx src/cli/index.ts rulesets list --filter openai
 ```
 
 Supported schedule phrases include:

@@ -103,6 +103,46 @@ describe("natural language authoring", () => {
     ).toBe(true);
   });
 
+  it("prefers active official rule sets for recognized site bundles and keeps verification hints concrete", () => {
+    const plan = generateRulesFromPrompt("ChatGPT 和 Perplexity 走香港", {
+      activeRuleSetTags: ["geosite-openai", "geosite-perplexity"],
+    });
+
+    expect(
+      plan.beforeBuiltins.some(
+        (rule) => rule.ruleSet?.includes("geosite-openai") && rule.route === "HK",
+      ),
+    ).toBe(true);
+    expect(
+      plan.beforeBuiltins.some(
+        (rule) => rule.ruleSet?.includes("geosite-perplexity") && rule.route === "HK",
+      ),
+    ).toBe(true);
+    expect(plan.beforeBuiltins.some((rule) => rule.domainSuffix?.includes("chatgpt.com"))).toBe(
+      false,
+    );
+    expect(
+      plan.verificationOverrides?.some(
+        (override) => override.domainSuffix === "chatgpt.com" && override.expectedOutbound === "HK",
+      ),
+    ).toBe(true);
+  });
+
+  it("records a fallback note when an official site bundle tag is known but not active locally", () => {
+    const plan = generateRulesFromPrompt("ChatGPT 走香港");
+
+    expect(plan.beforeBuiltins.some((rule) => rule.domainSuffix?.includes("chatgpt.com"))).toBe(
+      true,
+    );
+    expect(
+      plan.notes.some(
+        (note) =>
+          note.includes('Site bundle "ChatGPT" fell back to curated domains') &&
+          note.includes("geosite-openai"),
+      ),
+    ).toBe(true);
+  });
+
   it("reports ambiguity diagnostics for vague developer routing prompts", () => {
     const analysis = analyzePrompt("AI 都走好一点的节点，GitHub 大部分走香港");
 

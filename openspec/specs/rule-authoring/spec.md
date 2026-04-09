@@ -10,6 +10,7 @@ Allow users to customize routing intent with a compact YAML DSL instead of raw s
 - The DSL must support explicit insertion points relative to built-in routing behavior.
 - The project must provide a small catalog of built-in rule templates for common developer and video-site use cases.
 - The project must provide a first-class built-in site bundle registry so common product names can resolve to maintained related domain sets.
+- The project must provide a refreshable official rule-set catalog sourced from upstream `sing-geosite` and `sing-geoip` rule-set branches.
 - The project must provide maintained built-in process bundle metadata so common developer and AI tools can resolve to reusable process matchers.
 - Mainstream subscription vocabulary such as Google services, Apple services, Netflix, Amazon Prime Video, Apple TV, and common developer-site classes should map cleanly to authoring intent.
 - Natural-language authoring should resolve recognized product names through the built-in site and process bundle registries before falling back to ad-hoc explicit domains or generic process notes.
@@ -41,6 +42,7 @@ Allow users to customize routing intent with a compact YAML DSL instead of raw s
 - `use --replace` must remain available for explicit full replacement of the authored policy set.
 - Schedule installation must remain an explicit action even when a prompt contains interval language.
 - Local AI CLI integrations must be bounded to DSL-plan generation and must not write raw sing-box JSON directly.
+- Site bundles should prefer configured official rule-set tags when they are available and fall back to maintained exact domains and domain suffixes when they are not.
 
 ## Insertion Points
 
@@ -59,4 +61,6 @@ Allow users to customize routing intent with a compact YAML DSL instead of raw s
 ## Bundle Discovery
 
 - site bundles should include canonical product names, related domain suffixes, and suggested verification URLs
+- site bundles should include preferred official rule-set tags when upstream coverage exists
+- site bundles should still retain curated fallback domains for products without official tags or for configs that have not enabled those tags yet
 - process bundles should include reusable process matchers and prompt-discovery aliases

@@ -101,7 +101,14 @@ flowchart TD
 - 进程 bundle
   - 例如 `Antigravity`、`Cursor`、`VS Code`、`Codex`
 
-这意味着多数情况下你不需要自己记住相关域名或辅助进程名。
+站点 bundle 现在走双轨：
+
+- 优先使用当前 config 已启用的官方 `sing-geosite` rule-set tags
+- 如果 upstream 没有对应 tag，或者当前 config 还没启用该 tag，就回退到内置维护的 fallback domains
+
+进程 bundle 则继续提供稳定的 `Proxifier` / `in-proxifier` 进程匹配元数据。
+
+这意味着多数情况下你不需要自己记住相关域名、官方 geosite tag，或辅助进程名。
 
 ### 2. 极简 DSL
 
@@ -210,6 +217,18 @@ singbox-iac diagnose
 `status` 适合看当前运行快照；`diagnose` 适合继续判断问题更像是运行时漂移、系统 DNS/默认路由异常，还是最近一次发布没有生效。
 
 其余命令都属于 power-user / 工程命令，主要用于拆流程、排障或更细粒度控制。
+
+例如：
+
+```bash
+singbox-iac rulesets list --filter openai
+```
+
+这个隐藏命令可以查看：
+
+- 当前 builder config 已启用哪些 `ruleSet` tags
+- upstream 官方 `sing-geosite` / `sing-geoip` 当前有哪些 tags
+- 内置 site bundle 会优先命中哪些官方 tags，哪些还会走 fallback
 
 `RuntimeMode` 是内部概念，不要求用户手动选择。当前 onboarding 和 `update` 会自动推断 `browser-proxy`、`process-proxy` 或 `headless-daemon`，并据此调整可见验证和运行时默认行为。详见 [docs/runtime-modes.md](./docs/runtime-modes.md)。
 

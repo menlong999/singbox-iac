@@ -28,10 +28,11 @@ describe("layered authoring", () => {
     ]);
 
     expect(merged.templateIds).toEqual(["video-sg"]);
-    expect(merged.beforeBuiltins[0]).toMatchObject({
-      domainSuffix: ["gemini.google.com"],
-      route: "SG",
-    });
+    expect(
+      merged.beforeBuiltins.some(
+        (rule) => rule.domainSuffix?.includes("gemini.google.com") && rule.route === "SG",
+      ),
+    ).toBe(true);
     expect(
       merged.beforeBuiltins.some(
         (rule) => rule.domainSuffix?.includes("openrouter.ai") && rule.route === "HK",

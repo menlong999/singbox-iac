@@ -18,6 +18,7 @@ import { registerProxifierCommand } from "./commands/proxifier.js";
 import { registerReloadCommand } from "./commands/reload.js";
 import { registerRestartCommand } from "./commands/restart.js";
 import { registerRollbackCommand } from "./commands/rollback.js";
+import { registerRuleSetsCommand } from "./commands/rulesets.js";
 import { registerRunCommand } from "./commands/run.js";
 import { registerRuntimeWatchdogCommand } from "./commands/runtime-watchdog.js";
 import { registerScheduleCommand } from "./commands/schedule.js";
@@ -71,6 +72,7 @@ export function createProgram(): Command {
   registerApplyCommand(program);
   registerHistoryCommand(program);
   registerRunCommand(program);
+  registerRuleSetsCommand(program);
   registerRuntimeWatchdogCommand(program);
   registerRollbackCommand(program);
   registerVerifyCommand(program);
@@ -112,6 +114,7 @@ function hideAdvancedCommands(program: Command): void {
     "history",
     "run",
     "runtime-watchdog",
+    "rulesets",
     "rollback",
     "verify",
     "diagnose",

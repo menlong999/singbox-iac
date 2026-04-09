@@ -5,6 +5,7 @@ import type { Command } from "commander";
 
 import type { BuilderConfig } from "../../config/schema.js";
 import { buildConfigArtifact } from "../../modules/build/index.js";
+import { listBuiltInPreferredSiteRuleSetTags } from "../../modules/bundle-registry/index.js";
 import {
   defaultRuntimeLaunchAgentLabel,
   defaultRuntimeWatchdogLaunchAgentLabel,
@@ -103,18 +104,7 @@ async function resolveBuildConfig(options: BuildCommandOptions): Promise<Builder
         port: 39091,
       },
     },
-    ruleSets: [
-      localRuleSet("geosite-cn"),
-      localRuleSet("geoip-cn"),
-      localRuleSet("geosite-google"),
-      localRuleSet("geosite-google-gemini"),
-      localRuleSet("geosite-google-deepmind"),
-      localRuleSet("geosite-anthropic"),
-      localRuleSet("geosite-github"),
-      localRuleSet("geosite-github-copilot"),
-      localRuleSet("geosite-cursor"),
-      localRuleSet("geosite-figma"),
-    ],
+    ruleSets: defaultManagedRuleSetTags().map(localRuleSet),
     groups: {
       processProxy: {
         type: "selector",
@@ -196,6 +186,24 @@ async function resolveBuildConfig(options: BuildCommandOptions): Promise<Builder
       timeoutMs: 4000,
     },
   };
+}
+
+function defaultManagedRuleSetTags(): readonly string[] {
+  return [
+    ...new Set([
+      "geosite-cn",
+      "geoip-cn",
+      "geosite-google",
+      "geosite-google-gemini",
+      "geosite-google-deepmind",
+      "geosite-anthropic",
+      "geosite-github",
+      "geosite-github-copilot",
+      "geosite-cursor",
+      "geosite-figma",
+      ...listBuiltInPreferredSiteRuleSetTags(),
+    ]),
+  ];
 }
 
 function localRuleSet(tag: string): {

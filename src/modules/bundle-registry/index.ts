@@ -2,9 +2,21 @@ export interface SiteBundleSpec {
   readonly id: string;
   readonly name: string;
   readonly aliases: readonly string[];
-  readonly domainSuffixes: readonly string[];
+  readonly preferredRuleSetTags?: readonly string[];
+  readonly fallbackDomains?: readonly string[];
+  readonly fallbackDomainSuffixes?: readonly string[];
   readonly verificationUrls: readonly string[];
   readonly tags: readonly string[];
+  readonly notes?: readonly string[];
+}
+
+export interface ResolvedSiteBundleMatchers {
+  readonly bundleId: string;
+  readonly bundleName: string;
+  readonly ruleSet?: readonly string[];
+  readonly domain?: readonly string[];
+  readonly domainSuffix?: readonly string[];
+  readonly usedFallback: boolean;
 }
 
 export interface ProcessBundleMatcher {
@@ -39,7 +51,7 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "notebooklm",
     name: "NotebookLM",
     aliases: ["notebooklm", "notebook lm"],
-    domainSuffixes: ["notebooklm.google.com"],
+    fallbackDomainSuffixes: ["notebooklm.google.com"],
     verificationUrls: ["https://notebooklm.google.com/favicon.ico"],
     tags: ["ai", "google"],
   },
@@ -47,7 +59,7 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "openrouter",
     name: "OpenRouter",
     aliases: ["openrouter"],
-    domainSuffixes: ["openrouter.ai"],
+    fallbackDomainSuffixes: ["openrouter.ai"],
     verificationUrls: ["https://openrouter.ai/favicon.ico"],
     tags: ["ai"],
   },
@@ -55,7 +67,8 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "perplexity",
     name: "Perplexity",
     aliases: ["perplexity"],
-    domainSuffixes: ["perplexity.ai"],
+    preferredRuleSetTags: ["geosite-perplexity"],
+    fallbackDomainSuffixes: ["perplexity.ai", "perplexity.com", "pplx.ai"],
     verificationUrls: ["https://www.perplexity.ai/favicon.ico"],
     tags: ["ai"],
   },
@@ -63,7 +76,9 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "chatgpt",
     name: "ChatGPT",
     aliases: ["chatgpt"],
-    domainSuffixes: ["chatgpt.com"],
+    preferredRuleSetTags: ["geosite-openai"],
+    fallbackDomainSuffixes: ["chatgpt.com", "oaistatic.com", "oaiusercontent.com"],
+    fallbackDomains: ["chat.openai.com.cdn.cloudflare.net", "api.statsig.com"],
     verificationUrls: ["https://chatgpt.com/favicon.ico"],
     tags: ["ai", "openai"],
   },
@@ -71,7 +86,19 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "openai",
     name: "OpenAI",
     aliases: ["openai", "openai api"],
-    domainSuffixes: ["openai.com", "api.openai.com"],
+    preferredRuleSetTags: ["geosite-openai"],
+    fallbackDomainSuffixes: [
+      "openai.com",
+      "oaistatic.com",
+      "oaiusercontent.com",
+      "openaiapi-site.azureedge.net",
+      "openaicom.imgix.net",
+    ],
+    fallbackDomains: [
+      "openai-api.arkoselabs.com",
+      "production-openaicom-storage.azureedge.net",
+      "openaicomproductionae4b.blob.core.windows.net",
+    ],
     verificationUrls: ["https://openai.com/favicon.ico"],
     tags: ["ai"],
   },
@@ -79,7 +106,18 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "gemini",
     name: "Gemini",
     aliases: ["gemini", "google gemini"],
-    domainSuffixes: ["gemini.google.com"],
+    preferredRuleSetTags: ["geosite-google-gemini"],
+    fallbackDomainSuffixes: [
+      "gemini.google.com",
+      "generativelanguage.googleapis.com",
+      "proactivebackend-pa.googleapis.com",
+      "aisandbox-pa.googleapis.com",
+      "robinfrontend-pa.googleapis.com",
+      "alkalimakersuite-pa.clients6.google.com",
+      "alkalicore-pa.clients6.google.com",
+      "waa-pa.clients6.google.com",
+    ],
+    fallbackDomains: ["ai.google.dev", "makersuite.google.com", "aistudio.google.com"],
     verificationUrls: ["https://gemini.google.com/favicon.ico"],
     tags: ["ai", "google"],
   },
@@ -87,7 +125,8 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "anthropic",
     name: "Anthropic / Claude",
     aliases: ["anthropic", "claude", "claude ai"],
-    domainSuffixes: ["anthropic.com", "claude.ai"],
+    preferredRuleSetTags: ["geosite-anthropic"],
+    fallbackDomainSuffixes: ["anthropic.com", "claude.ai"],
     verificationUrls: ["https://claude.ai/favicon.ico"],
     tags: ["ai"],
   },
@@ -95,7 +134,8 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "github",
     name: "GitHub",
     aliases: ["github", "github copilot"],
-    domainSuffixes: ["github.com", "githubusercontent.com"],
+    preferredRuleSetTags: ["geosite-github", "geosite-github-copilot"],
+    fallbackDomainSuffixes: ["github.com", "githubusercontent.com"],
     verificationUrls: ["https://github.com/favicon.ico"],
     tags: ["developer"],
   },
@@ -103,7 +143,18 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "google-services",
     name: "Google Services",
     aliases: ["google 服务", "google services"],
-    domainSuffixes: ["google.com", "googleapis.com", "gstatic.com", "googlevideo.com"],
+    preferredRuleSetTags: ["geosite-google"],
+    fallbackDomainSuffixes: [
+      "google.com",
+      "googleapis.com",
+      "gstatic.com",
+      "googlevideo.com",
+      "1e100.net",
+      "appspot.com",
+      "gcr.io",
+      "gvt0.com",
+      "gvt1.com",
+    ],
     verificationUrls: ["https://www.google.com/favicon.ico"],
     tags: ["google", "services"],
   },
@@ -111,7 +162,9 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "apple-services",
     name: "Apple Services",
     aliases: ["apple 服务", "apple services", "icloud"],
-    domainSuffixes: ["apple.com", "icloud.com", "mzstatic.com"],
+    preferredRuleSetTags: ["geosite-apple"],
+    fallbackDomainSuffixes: ["apple.com", "icloud.com", "mzstatic.com", "apple-dns.net"],
+    fallbackDomains: ["apple-relay.apple.com"],
     verificationUrls: ["https://www.icloud.com/favicon.ico"],
     tags: ["apple", "services"],
   },
@@ -119,7 +172,7 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "google-stitch",
     name: "Google Stitch",
     aliases: ["google stitch", "stitch"],
-    domainSuffixes: ["stitch.withgoogle.com"],
+    fallbackDomainSuffixes: ["stitch.withgoogle.com"],
     verificationUrls: ["https://stitch.withgoogle.com/favicon.ico"],
     tags: ["google", "developer"],
   },
@@ -127,7 +180,7 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "google-tv",
     name: "Google TV",
     aliases: ["google tv"],
-    domainSuffixes: ["tv.youtube.com"],
+    fallbackDomains: ["tv.youtube.com"],
     verificationUrls: ["https://tv.youtube.com/favicon.ico"],
     tags: ["video", "google"],
   },
@@ -135,7 +188,8 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "youtube",
     name: "YouTube",
     aliases: ["youtube"],
-    domainSuffixes: ["youtube.com", "youtu.be"],
+    preferredRuleSetTags: ["geosite-youtube"],
+    fallbackDomainSuffixes: ["youtube.com", "youtu.be", "ytimg.com"],
     verificationUrls: ["https://www.youtube.com/favicon.ico"],
     tags: ["video"],
   },
@@ -143,7 +197,17 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "netflix",
     name: "Netflix",
     aliases: ["netflix"],
-    domainSuffixes: ["netflix.com", "nflxvideo.net"],
+    preferredRuleSetTags: ["geosite-netflix"],
+    fallbackDomainSuffixes: [
+      "netflix.com",
+      "netflix.net",
+      "nflxext.com",
+      "nflximg.com",
+      "nflximg.net",
+      "nflxso.net",
+      "nflxvideo.net",
+      "fast.com",
+    ],
     verificationUrls: ["https://www.netflix.com/favicon.ico"],
     tags: ["video"],
   },
@@ -151,7 +215,8 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "amazon-prime",
     name: "Amazon Prime Video",
     aliases: ["amazon prime", "prime video", "primevideo", "amazon video"],
-    domainSuffixes: ["primevideo.com", "amazonvideo.com"],
+    preferredRuleSetTags: ["geosite-primevideo"],
+    fallbackDomainSuffixes: ["primevideo.com", "amazonvideo.com"],
     verificationUrls: ["https://www.primevideo.com/favicon.ico"],
     tags: ["video"],
   },
@@ -159,7 +224,15 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "disney-plus",
     name: "Disney+",
     aliases: ["disney+", "disney plus", "disneyplus"],
-    domainSuffixes: ["disneyplus.com", "disney-plus.net"],
+    preferredRuleSetTags: ["geosite-disney"],
+    fallbackDomainSuffixes: [
+      "disneyplus.com",
+      "disney-plus.net",
+      "disneystreaming.com",
+      "bamgrid.com",
+      "dssott.com",
+    ],
+    fallbackDomains: ["cdn.registerdisney.go.com"],
     verificationUrls: ["https://www.disneyplus.com/favicon.ico"],
     tags: ["video"],
   },
@@ -167,7 +240,8 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "apple-tv",
     name: "Apple TV",
     aliases: ["apple tv"],
-    domainSuffixes: ["tv.apple.com"],
+    preferredRuleSetTags: ["geosite-apple-tvplus"],
+    fallbackDomainSuffixes: ["tv.apple.com"],
     verificationUrls: ["https://tv.apple.com/favicon.ico"],
     tags: ["video", "apple"],
   },
@@ -175,7 +249,8 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "bilibili",
     name: "Bilibili",
     aliases: ["bilibili", "b站"],
-    domainSuffixes: ["bilibili.com", "bilibili.tv"],
+    preferredRuleSetTags: ["geosite-bilibili"],
+    fallbackDomainSuffixes: ["bilibili.com", "bilibili.tv"],
     verificationUrls: ["https://www.bilibili.com/favicon.ico"],
     tags: ["video", "cn"],
   },
@@ -183,7 +258,8 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "iqiyi",
     name: "iQIYI",
     aliases: ["iqiyi", "爱奇艺"],
-    domainSuffixes: ["iqiyi.com", "iq.com"],
+    preferredRuleSetTags: ["geosite-iqiyi"],
+    fallbackDomainSuffixes: ["iqiyi.com", "iq.com"],
     verificationUrls: ["https://www.iqiyi.com/favicon.ico"],
     tags: ["video", "cn"],
   },
@@ -191,7 +267,8 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "youku",
     name: "Youku",
     aliases: ["youku", "优酷"],
-    domainSuffixes: ["youku.com"],
+    preferredRuleSetTags: ["geosite-youku"],
+    fallbackDomainSuffixes: ["youku.com"],
     verificationUrls: ["https://www.youku.com/favicon.ico"],
     tags: ["video", "cn"],
   },
@@ -199,9 +276,152 @@ const siteBundleDefinitions: readonly SiteBundleSpec[] = [
     id: "mgtv",
     name: "MGTV",
     aliases: ["mgtv", "芒果tv", "芒果"],
-    domainSuffixes: ["mgtv.com"],
+    fallbackDomainSuffixes: ["mgtv.com"],
     verificationUrls: ["https://www.mgtv.com/favicon.ico"],
     tags: ["video", "cn"],
+  },
+  {
+    id: "line",
+    name: "LINE",
+    aliases: ["line"],
+    preferredRuleSetTags: ["geosite-line"],
+    fallbackDomainSuffixes: [
+      "line.me",
+      "line.naver.jp",
+      "line-apps.com",
+      "line-cdn.net",
+      "line-scdn.net",
+      "lin.ee",
+    ],
+    verificationUrls: ["https://line.me/favicon.ico"],
+    tags: ["social"],
+  },
+  {
+    id: "bbc",
+    name: "BBC",
+    aliases: ["bbc"],
+    preferredRuleSetTags: ["geosite-bbc"],
+    fallbackDomainSuffixes: ["bbc.co", "bbc.com"],
+    verificationUrls: ["https://www.bbc.com/favicon.ico"],
+    tags: ["media"],
+  },
+  {
+    id: "microsoft-services",
+    name: "Microsoft Services",
+    aliases: ["microsoft", "copilot microsoft", "bing copilot"],
+    preferredRuleSetTags: ["geosite-microsoft"],
+    fallbackDomainSuffixes: [
+      "bing.com",
+      "bing.net",
+      "live.com",
+      "live.net",
+      "msn.com",
+      "office.com",
+      "office.net",
+      "outlook.com",
+      "office365.com",
+      "onedrive.com",
+      "onenote.com",
+      "hotmail.com",
+      "msedge.net",
+    ],
+    fallbackDomains: [
+      "api.msn.com",
+      "assets.msn.com",
+      "content.office.net",
+      "copilot.microsoft.com",
+    ],
+    verificationUrls: ["https://www.bing.com/favicon.ico"],
+    tags: ["microsoft", "services"],
+  },
+  {
+    id: "xai",
+    name: "xAI / Grok",
+    aliases: ["xai", "grok"],
+    preferredRuleSetTags: ["geosite-xai"],
+    fallbackDomainSuffixes: ["x.ai", "grok.com"],
+    verificationUrls: ["https://x.ai/favicon.ico"],
+    tags: ["ai"],
+  },
+  {
+    id: "leetcode",
+    name: "LeetCode",
+    aliases: ["leetcode", "力扣"],
+    fallbackDomainSuffixes: ["leetcode.com"],
+    verificationUrls: ["https://leetcode.com/favicon.ico"],
+    tags: ["developer", "learning"],
+  },
+  {
+    id: "tradingview",
+    name: "TradingView",
+    aliases: ["tradingview", "trading view"],
+    fallbackDomainSuffixes: ["tradingview.com"],
+    verificationUrls: ["https://www.tradingview.com/favicon.ico"],
+    tags: ["finance", "tools"],
+  },
+  {
+    id: "typingmind",
+    name: "TypingMind",
+    aliases: ["typingmind", "typing mind"],
+    fallbackDomainSuffixes: ["typingmind.com"],
+    verificationUrls: ["https://www.typingmind.com/favicon.ico"],
+    tags: ["ai", "tools"],
+  },
+  {
+    id: "roam-research",
+    name: "Roam Research",
+    aliases: ["roam research", "roamresearch"],
+    fallbackDomainSuffixes: ["roamresearch.com"],
+    verificationUrls: ["https://roamresearch.com/favicon.ico"],
+    tags: ["notes", "tools"],
+  },
+  {
+    id: "todoist",
+    name: "Todoist",
+    aliases: ["todoist"],
+    fallbackDomainSuffixes: ["todoist.com"],
+    verificationUrls: ["https://todoist.com/favicon.ico"],
+    tags: ["productivity", "tools"],
+  },
+  {
+    id: "ifttt",
+    name: "IFTTT",
+    aliases: ["ifttt"],
+    fallbackDomainSuffixes: ["ifttt.com", "ift.tt"],
+    verificationUrls: ["https://ifttt.com/favicon.ico"],
+    tags: ["automation", "tools"],
+  },
+  {
+    id: "humble-bundle",
+    name: "Humble Bundle",
+    aliases: ["humble bundle", "humblebundle"],
+    fallbackDomainSuffixes: ["humblebundle.com"],
+    verificationUrls: ["https://www.humblebundle.com/favicon.ico"],
+    tags: ["gaming", "store"],
+  },
+  {
+    id: "fanatical",
+    name: "Fanatical",
+    aliases: ["fanatical"],
+    fallbackDomainSuffixes: ["fanatical.com"],
+    verificationUrls: ["https://www.fanatical.com/favicon.ico"],
+    tags: ["gaming", "store"],
+  },
+  {
+    id: "grindr",
+    name: "Grindr",
+    aliases: ["grindr"],
+    fallbackDomainSuffixes: ["grindr.com", "grindr.mobi"],
+    verificationUrls: ["https://www.grindr.com/favicon.ico"],
+    tags: ["social"],
+  },
+  {
+    id: "behance",
+    name: "Behance",
+    aliases: ["behance"],
+    fallbackDomainSuffixes: ["behance.net"],
+    verificationUrls: ["https://www.behance.net/favicon.ico"],
+    tags: ["design", "community"],
   },
 ];
 
@@ -414,14 +634,87 @@ export function selectProcessBundlesFromText(text: string): readonly ProcessBund
   return processBundleDefinitions.filter((bundle) => selected.has(bundle.id));
 }
 
-export function collectSiteBundleDomains(bundles: readonly SiteBundleSpec[]): readonly string[] {
+export function listBuiltInPreferredSiteRuleSetTags(): readonly string[] {
+  const tags = new Set<string>();
+  for (const bundle of siteBundleDefinitions) {
+    for (const tag of bundle.preferredRuleSetTags ?? []) {
+      tags.add(tag);
+    }
+  }
+  return [...tags].sort();
+}
+
+export function resolveSiteBundleMatchers(
+  bundles: readonly SiteBundleSpec[],
+  activeRuleSetTags: ReadonlySet<string>,
+): readonly ResolvedSiteBundleMatchers[] {
+  const resolved: ResolvedSiteBundleMatchers[] = [];
+
+  for (const bundle of bundles) {
+    const preferredRuleSets = (bundle.preferredRuleSetTags ?? []).filter((tag) =>
+      activeRuleSetTags.has(tag),
+    );
+
+    if (preferredRuleSets.length > 0) {
+      resolved.push({
+        bundleId: bundle.id,
+        bundleName: bundle.name,
+        ruleSet: preferredRuleSets,
+        usedFallback: false,
+      });
+      continue;
+    }
+
+    if (
+      (!bundle.fallbackDomains || bundle.fallbackDomains.length === 0) &&
+      (!bundle.fallbackDomainSuffixes || bundle.fallbackDomainSuffixes.length === 0)
+    ) {
+      continue;
+    }
+
+    resolved.push({
+      bundleId: bundle.id,
+      bundleName: bundle.name,
+      ...(bundle.fallbackDomains && bundle.fallbackDomains.length > 0
+        ? { domain: [...bundle.fallbackDomains] }
+        : {}),
+      ...(bundle.fallbackDomainSuffixes && bundle.fallbackDomainSuffixes.length > 0
+        ? { domainSuffix: [...bundle.fallbackDomainSuffixes] }
+        : {}),
+      usedFallback: true,
+    });
+  }
+
+  return resolved;
+}
+
+export function collectSiteBundleFallbackHosts(
+  bundles: readonly SiteBundleSpec[],
+): readonly string[] {
   const domains = new Set<string>();
   for (const bundle of bundles) {
-    for (const domain of bundle.domainSuffixes) {
+    for (const domain of bundle.fallbackDomains ?? []) {
+      domains.add(domain);
+    }
+    for (const domain of bundle.fallbackDomainSuffixes ?? []) {
       domains.add(domain);
     }
   }
   return [...domains];
+}
+
+export function collectSiteBundleVerificationHosts(
+  bundles: readonly SiteBundleSpec[],
+): readonly string[] {
+  const hosts = new Set<string>();
+  for (const bundle of bundles) {
+    for (const url of bundle.verificationUrls) {
+      try {
+        hosts.add(new URL(url).hostname.toLowerCase());
+      } catch {}
+    }
+  }
+  return [...hosts];
 }
 
 function normalizeText(text: string): string {

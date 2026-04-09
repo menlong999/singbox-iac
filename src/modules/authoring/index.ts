@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { constants } from "node:fs";
+import { constants, existsSync } from "node:fs";
 import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -155,7 +155,7 @@ export async function generateAuthoringPlan(
   const providerRequested = input.provider ?? input.config?.authoring.provider ?? "deterministic";
   const timeoutMs = input.timeoutMs ?? input.config?.authoring.timeoutMs ?? defaultTimeoutMs;
   const runner = input.runner ?? runAuthoringCommand;
-  const promptAnalysis = analyzePrompt(input.prompt);
+  const promptAnalysis = analyzePrompt(input.prompt, analysisOptionsForConfig(input.config));
 
   if (input.strict && promptAnalysis.ambiguities.length > 0) {
     throw new Error(
@@ -273,7 +273,7 @@ async function generateWithAuto(
   timeoutMs: number,
   runner: AuthoringCommandRunner,
 ): Promise<GenerateAuthoringPlanResult> {
-  const promptAnalysis = analyzePrompt(prompt);
+  const promptAnalysis = analyzePrompt(prompt, analysisOptionsForConfig(config));
   if (execCommand || config?.authoring.exec?.command) {
     try {
       const plan = await generateWithExec(
@@ -296,6 +296,7 @@ async function generateWithAuto(
     } catch (error) {
       return fallbackDeterministic(
         prompt,
+        config,
         "exec",
         error instanceof Error ? error.message : String(error),
         promptAnalysis.ambiguities,
@@ -317,6 +318,7 @@ async function generateWithAuto(
     } catch (error) {
       return fallbackDeterministic(
         prompt,
+        config,
         "claude",
         error instanceof Error ? error.message : String(error),
         promptAnalysis.ambiguities,
@@ -324,7 +326,7 @@ async function generateWithAuto(
     }
   }
 
-  const plan = appendNotes(generateRulesFromPrompt(prompt), [
+  const plan = appendNotes(generateRulesFromPrompt(prompt, analysisOptionsForConfig(config)), [
     "Auto authoring fell back to the built-in deterministic parser because no supported local AI CLI was available.",
   ]);
 
@@ -551,6 +553,7 @@ function buildAuthoringSystemPrompt(config?: BuilderConfig): string {
     "Respond only with JSON matching the supplied schema.",
     "Use templateIds for common site bundles when possible.",
     "Resolve recognized product names through the built-in site and process bundle registries before inventing new domains or process names.",
+    "Prefer active ruleSet tags for recognized site bundles and only fall back to domains when upstream rule-set tags are unavailable in the current config.",
     "Use beforeBuiltins for non-direct overrides and afterBuiltins for direct routing.",
     "Do not invent process-matching rules for IDE or Proxifier phrases; emit a short note instead.",
     `Allowed route targets: ${context.allowedRoutes.join(", ")}`,
@@ -625,11 +628,12 @@ function buildPortableExecPrompt(config: BuilderConfig | undefined, prompt: stri
 
 function fallbackDeterministic(
   prompt: string,
+  config: BuilderConfig | undefined,
   providerUsed: Exclude<AuthoringProvider, "auto" | "deterministic">,
   reason: string,
   ambiguities: readonly string[],
 ): GenerateAuthoringPlanResult {
-  const plan = appendNotes(generateRulesFromPrompt(prompt), [
+  const plan = appendNotes(generateRulesFromPrompt(prompt, analysisOptionsForConfig(config)), [
     `Auto authoring fell back from ${providerUsed} to the deterministic parser: ${reason}`,
   ]);
 
@@ -649,6 +653,20 @@ function appendNotes(
   return {
     ...plan,
     notes: [...plan.notes, ...extraNotes],
+  };
+}
+
+function analysisOptionsForConfig(config: BuilderConfig | undefined): {
+  readonly activeRuleSetTags?: readonly string[];
+} {
+  if (!config) {
+    return {};
+  }
+
+  return {
+    activeRuleSetTags: config.ruleSets
+      .filter((ruleSet) => ruleSet.path.length > 0 && existsSync(ruleSet.path))
+      .map((ruleSet) => ruleSet.tag),
   };
 }
 
