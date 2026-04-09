@@ -22,6 +22,10 @@ describe("package distribution metadata", () => {
     expect(packageJson.files).toEqual(
       expect.arrayContaining(["dist", "README.md", "docs", "examples"]),
     );
+    expect(packageJson.scripts?.["clean:dist"]).toBe(
+      "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    );
+    expect(packageJson.scripts?.build).toBe("npm run clean:dist && tsc -p tsconfig.json");
     expect(packageJson.scripts?.prepare).toBe("npm run build");
     expect(packageJson.scripts?.prepack).toBe("npm run build");
     expect(packageJson.scripts?.["release:check"]).toBe("node ./scripts/release-check.mjs");
