@@ -2,24 +2,35 @@
 
 ## Goal
 
-Provide a user-friendly command-line interface for initialization, build, apply, update, diagnostics, and scheduling.
+Provide a user-friendly command-line interface for onboarding, authoring, publish/update flows, diagnostics, and supporting power-user operations.
 
-## Planned Commands
+## Command Surface
 
+Primary user path:
 - `go`
 - `use`
 - `update`
+
+Health and diagnostics:
+- `doctor`
+- `status`
+- `diagnose`
+
+Power-user authoring and build flow:
 - `init`
 - `setup`
 - `author`
 - `build`
 - `check`
+- `verify`
 - `apply`
 - `run`
-- `verify`
-- `update`
-- `doctor`
-- `diagnose`
+- `reload`
+- `restart`
+- `rollback`
+- `history`
+
+Focused command groups:
 - `proxifier bundles`
 - `proxifier scaffold`
 - `schedule install`
